@@ -28,6 +28,17 @@ export async function loadCity(): Promise<CitySnapshot> {
   };
 }
 
+// Quiénes ayudaron en una construcción, en orden.
+export async function loadHelps(constructionId: string): Promise<{ helper_id: string; created_at: string }[]> {
+  return unwrap(
+    await sb
+      .from('construction_helps')
+      .select('helper_id, created_at')
+      .eq('construction_id', constructionId)
+      .order('created_at'),
+  );
+}
+
 export async function loadMe(uid: string): Promise<{ me: Player | null; inventory: Inventory | null }> {
   const [me, inventory] = await Promise.all([
     sb.from('players').select('*').eq('id', uid).maybeSingle(),

@@ -1,8 +1,9 @@
 // Un wrapper tipado por RPC (docs/06-acciones-y-api.md). Traduce errores y actualiza el store.
 import { sb } from './client';
 import { codeOf, GameError } from './errors';
+import { refreshMe } from './sync';
 import { useCity } from '../store/city';
-import type { JoinMap, Lot } from '../types/game';
+import type { BuildingType, Construction, JoinMap, Lot } from '../types/game';
 
 export type InvitationInfo = {
   valid: boolean;
@@ -42,4 +43,26 @@ export async function claimLot(p: {
   if (error) throw new GameError(codeOf(error));
   useCity.getState().applyLot(data as Lot);
   return data as Lot;
+}
+
+export async function renameLot(name: string): Promise<void> {
+  const { error } = await sb.rpc('rename_lot', { p_name: name });
+  if (error) throw new GameError(codeOf(error));
+  useCity.getState().patchMyLot({ name });
+}
+
+export async function recolorLot(color: string): Promise<void> {
+  const { error } = await sb.rpc('recolor_lot', { p_color: color });
+  if (error) throw new GameError(codeOf(error));
+  useCity.getState().patchMyLot({ color });
+}
+
+// Nivel 1 (elige el tipo) o mejora al siguiente nivel.
+export async function build(type: BuildingType): Promise<Construction> {
+  const { data, error } = await sb.rpc('build', { p_building_type: type });
+  if (error) throw new GameError(codeOf(error));
+  useCity.getState().applyConstruction(data as Construction);
+  // Gastó una jornada y materiales (y recogió producción): si la relectura falla, la corrige la próxima.
+  await refreshMe().catch(() => {});
+  return data as Construction;
 }

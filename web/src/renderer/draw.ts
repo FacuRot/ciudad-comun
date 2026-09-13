@@ -1,6 +1,7 @@
 // Dibuja la ciudad entera en cada cuadro. Sin optimizaciones: son ~100 celdas.
 import type { MapBarrio as Barrio, MapLot as Lot, MapWork as PublicWork } from '../types/game';
 import { workPercent, type Cell } from '../game/geo';
+import { BUILDING_GLYPH } from '../game/format';
 import type { Layout } from './layout';
 import { ABANDONED, desaturate, lotColor, mix } from './colors';
 import { phaseAt, type Phase } from './time';
@@ -27,7 +28,6 @@ const THEME: Record<Phase, { ground: string; street: string; ink: string; overla
 };
 
 const ACCENT = '#2b8a80';
-const GLYPH: Record<string, string> = { ladrilleria: '■', aserradero: '▲', generador: '⚡︎', plaza: '✿' };
 // Lado del edificio respecto del tile, por nivel (0 = sin edificio).
 const BUILDING_SIZE = [0, 0.42, 0.58, 0.74];
 
@@ -168,7 +168,7 @@ function drawLot(ctx: CanvasRenderingContext2D, lot: Lot, px: number, py: number
     ctx.font = `${Math.round(t * 0.26)}px system-ui, sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(GLYPH[lot.building_type], px + t / 2, py + t / 2 + 1);
+    ctx.fillText(BUILDING_GLYPH[lot.building_type], px + t / 2, py + t / 2 + 1);
   }
 }
 

@@ -4,11 +4,11 @@ import { messageOf } from '../api/errors';
 import { useCity } from '../store/city';
 import { CityCanvas } from '../renderer/CityCanvas';
 import type { Scene } from '../renderer/draw';
+import { MyLotPanel } from '../panels/MyLotPanel';
 import { gridSize, workPercent, type Cell } from '../game/geo';
+import { MATERIAL_LABEL } from '../game/format';
 import { configOf, type Inventory, type Material } from '../types/game';
 import { Notice } from '../App';
-
-const MATERIAL_LABEL: Record<Material, string> = { ladrillo: 'ladrillo', madera: 'madera', energia: 'energía' };
 
 // /city solo para quien tiene sesión y lote.
 export function CityGate() {
@@ -61,7 +61,7 @@ function CityScreen() {
       .filter(Boolean)
       .join(' · ');
 
-    return { scene, tooltip, footer, cap: configOf(city).jornadas.cap };
+    return { scene, tooltip, footer, myLot, cap: configOf(city).jornadas.cap };
   }, [snapshot, me.id]);
 
   if (error) return <Notice>{error}</Notice>;
@@ -77,6 +77,7 @@ function CityScreen() {
         <CityCanvas scene={view.scene} tooltip={view.tooltip} />
       </main>
       <footer className="mapfoot">{view.footer}</footer>
+      {view.myLot && <MyLotPanel lot={view.myLot} />}
     </div>
   );
 }

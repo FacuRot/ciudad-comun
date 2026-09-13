@@ -39,6 +39,13 @@ export type JoinMap = {
 export type CityConfig = {
   jornadas: { per_day: number; cap: number; initial: number };
   materials: { types: Material[]; starter: Record<Material, number> };
+  production: {
+    rate_by_level: Record<string, number>;
+    state_factor: Record<LotState, number>;
+    plaza_bonus: number;
+    plaza_bonus_cap: number;
+    public_work_bonus: number;
+  };
   buildings: {
     types: BuildingType[];
     produces: Record<BuildingType, Material | null>;

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { heartbeat } from '../api/actions';
-import { loadCity } from '../api/reads';
+import { connectCity } from '../api/live';
+import { refreshCity } from '../api/sync';
 import { messageOf } from '../api/errors';
 import { useCity } from '../store/city';
 import { CityCanvas } from '../renderer/CityCanvas';
@@ -24,16 +25,15 @@ export function CityGate() {
 
 function CityScreen() {
   const snapshot = useCity((s) => s.snapshot);
-  const setSnapshot = useCity((s) => s.setSnapshot);
   const me = useCity((s) => s.me)!;
   const inventory = useCity((s) => s.inventory);
   const [error, setError] = useState<string | null>(null);
 
+  // Carga inicial y después Realtime (o polling si Realtime no anda).
   useEffect(() => {
-    loadCity()
-      .then(setSnapshot)
-      .catch((e) => setError(messageOf(e)));
-  }, [setSnapshot]);
+    refreshCity().catch((e) => setError(messageOf(e)));
+    return connectCity();
+  }, []);
 
   // Producción perezosa: el latido recoge lo producido al abrir y cada vez que la pestaña vuelve a verse.
   useEffect(() => {

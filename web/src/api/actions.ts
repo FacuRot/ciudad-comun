@@ -3,7 +3,7 @@ import { sb } from './client';
 import { codeOf, GameError } from './errors';
 import { refreshMe } from './sync';
 import { useCity } from '../store/city';
-import type { BuildingType, Construction, JoinMap, Lot } from '../types/game';
+import type { BuildingType, Construction, JoinMap, Lot, Material } from '../types/game';
 
 export type InvitationInfo = {
   valid: boolean;
@@ -43,6 +43,22 @@ export async function claimLot(p: {
   if (error) throw new GameError(codeOf(error));
   useCity.getState().applyLot(data as Lot);
   return data as Lot;
+}
+
+export type Heartbeat = {
+  hours_away: number;
+  since: string;
+  collected: { material?: Material; amount?: number }; // vacío si no había nada para recoger
+  show_summary: boolean;
+};
+
+// Al abrir la app y al volver a la pestaña: recoge la producción y marca que el jugador está.
+// No devuelve jornadas ni inventario, así que después se releen para la barra superior.
+export async function heartbeat(): Promise<Heartbeat> {
+  const { data, error } = await sb.rpc('heartbeat');
+  if (error) throw new GameError(codeOf(error));
+  await refreshMe();
+  return data as unknown as Heartbeat;
 }
 
 export async function renameLot(name: string): Promise<void> {

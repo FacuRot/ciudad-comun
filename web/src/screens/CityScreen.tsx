@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { heartbeat } from '../api/actions';
 import { loadCity } from '../api/reads';
 import { messageOf } from '../api/errors';
 import { useCity } from '../store/city';
@@ -33,6 +34,16 @@ function CityScreen() {
       .then(setSnapshot)
       .catch((e) => setError(messageOf(e)));
   }, [setSnapshot]);
+
+  // Producción perezosa: el latido recoge lo producido al abrir y cada vez que la pestaña vuelve a verse.
+  useEffect(() => {
+    const beat = () => {
+      if (document.visibilityState === 'visible') heartbeat().catch(() => {});
+    };
+    beat();
+    document.addEventListener('visibilitychange', beat);
+    return () => document.removeEventListener('visibilitychange', beat);
+  }, []);
 
   const view = useMemo(() => {
     if (!snapshot) return null;

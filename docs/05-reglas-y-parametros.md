@@ -42,6 +42,7 @@ Tres tipos: `ladrillo`, `madera`, `energia`.
 
 - El inventario es por jugador, no por lote.
 - La producción se **calcula perezosamente**: `producido = tasa_efectiva × horas desde production_collected_at`, con tope de 48 h. Se recoge automáticamente al entrar al juego y antes de cualquier acción del jugador.
+- Se entregan unidades enteras y la fracción sigue acumulando: el reloj avanza solo por lo entregado, así que entrar seguido no hace perder producción (corregido el 13/09/2026; antes cada recogida reiniciaba la cuenta aunque diera cero).
 - El kit inicial alcanza exactamente para construir el nivel 1 de cualquier edificio. A partir del nivel 2, ningún jugador puede avanzar solo.
 
 ## 3. Edificios

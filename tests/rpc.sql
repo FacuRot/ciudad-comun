@@ -185,6 +185,13 @@ select pg_temp.ok((heartbeat())->'collected' = '{"material":"energia","amount":2
 select pg_temp.ok((select energia = 30 from inventories where player_id = '11111111-1111-1111-1111-111111111111'), 'lo producido entra al inventario');
 update lots set production_collected_at = now() - interval '100 hours' where x = 0 and y = 0;
 select pg_temp.ok((heartbeat())->'collected'->>'amount' = '96', 'tope de 48 h de acumulación');
+update lots set production_collected_at = now() - interval '45 minutes' where x = 0 and y = 0;
+select pg_temp.ok((heartbeat())->'collected'->>'amount' = '1', 'entrega unidades enteras: 45 min × 2/h = 1');
+select pg_temp.ok((select abs(extract(epoch from production_collected_at - (now() - interval '15 minutes'))) < 1
+                     from lots where x = 0 and y = 0), 'la fracción sigue acumulando: el reloj avanza solo 30 min');
+select pg_temp.ok((heartbeat())->'collected' = '{}'::jsonb
+                  and (select abs(extract(epoch from production_collected_at - (now() - interval '15 minutes'))) < 1
+                         from lots where x = 0 and y = 0), 'recoger cero no reinicia la cuenta');
 
 -- ---------------------------------------------------------------------
 -- visit_lot

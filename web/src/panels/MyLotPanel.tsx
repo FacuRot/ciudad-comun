@@ -208,6 +208,9 @@ function BuildForm(props: {
   const have = (m: Material) => inventory?.[m] ?? 0;
   const needed = cfg.materials.types.filter((m) => next.cost[m] > 0);
   const missing = needed.filter((m) => have(m) < next.cost[m]);
+  // Lo que produce el propio lote llega solo: a los vecinos se les pide el resto.
+  const own = lot.level > 0 && lot.building_type ? cfg.buildings.produces[lot.building_type] : null;
+  const toAsk = missing.filter((m) => m !== own);
 
   const submit = async () => {
     if (!type) return;
@@ -284,11 +287,11 @@ function BuildForm(props: {
         </button>
       </div>
 
-      {missing.length > 0 && (
+      {toAsk.length > 0 && (
         <div className="ask">
           <p className="label">Pediles a tus vecinos</p>
           <ul>
-            {missing.map((m) => {
+            {toAsk.map((m) => {
               const producers = producersOf(m, lot.barrio_id, snapshot.lots, cfg, lot.owner_id ?? '');
               return (
                 <li key={m}>

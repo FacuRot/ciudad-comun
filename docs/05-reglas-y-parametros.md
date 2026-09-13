@@ -178,7 +178,7 @@ El estado depende de los **días desde la última entrada del dueño** (`players
 
 ## 11. Resumen "mientras no estabas"
 
-Se muestra al entrar si pasaron más de 4 horas desde `last_seen_at`. Contiene, en este orden de prioridad:
+Se muestra al entrar si pasaron más de 2 horas desde `last_seen_at` (igual que el nivel 1, para que al volver cuando termina la primera construcción el resumen lo cuente; antes del 13/09/2026 eran 4 horas). Contiene, en este orden de prioridad:
 
 1. Construcciones propias terminadas.
 2. Ayudas recibidas (quién).
@@ -232,7 +232,7 @@ Todos son idempotentes: correrlos dos veces no produce efectos dobles.
   "gift": { "min_amount": 5 },
   "lots": { "max_claim_distance": 2 },
   "barrio": { "open_threshold": 0.85, "open_after_days": 10 },
-  "summary": { "min_hours_away": 4 },
+  "summary": { "min_hours_away": 2 },
   "palette": ["terracota", "ocre", "oliva", "teal", "azul", "lila", "rosa", "gris"]
 }
 ```

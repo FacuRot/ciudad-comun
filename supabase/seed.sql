@@ -25,7 +25,7 @@ begin
     "gift": { "min_amount": 5 },
     "lots": { "max_claim_distance": 2 },
     "barrio": { "open_threshold": 0.85, "open_after_days": 10 },
-    "summary": { "min_hours_away": 4 },
+    "summary": { "min_hours_away": 2 },
     "palette": ["terracota","ocre","oliva","teal","azul","lila","rosa","gris"]
   }$j$::jsonb;
 

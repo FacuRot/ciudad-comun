@@ -1,0 +1,66 @@
+// Traduce los códigos que lanzan las funciones (docs/06-acciones-y-api.md) a mensajes.
+// Nunca se muestra el texto crudo de Postgres.
+
+const MESSAGES: Record<string, string> = {
+  NO_AUTH: 'Entrá con tu email para seguir.',
+  NO_PLAYER: 'Todavía no tenés lote. Entrá con el link de tu invitación.',
+  ALREADY_PLAYER: 'Ya tenés un lote en la ciudad.',
+  BAD_INVITE: 'Esta invitación ya no sirve. Pedile otra a quien te invitó.',
+  LOT_NOT_FREE: 'Alguien se adelantó. Elegí otro lote.',
+  LOT_ISOLATED: 'Elegí un lote más cerca de tus vecinos.',
+  BAD_COLOR: 'Elegí uno de los colores de la paleta.',
+  NO_JORNADAS: 'Te quedaste sin jornadas por hoy. Mañana tenés 3 más.',
+  NO_MATERIALS: 'Te faltan materiales. Pediles a tus vecinos.',
+  NO_LOT: 'Ese lote no está disponible.',
+  ALREADY_BUILDING: 'Tu lote ya está en obra.',
+  MAX_LEVEL: 'Tu edificio ya está al máximo.',
+  TYPE_LOCKED: 'El tipo de edificio no se cambia.',
+  NO_CONSTRUCTION: 'Esa obra ya terminó.',
+  OWN_CONSTRUCTION: 'Esto es para ayudar a otros.',
+  OWN_LOT: 'Esto es para ayudar a otros.',
+  SELF_GIFT: 'Esto es para ayudar a otros.',
+  OTHER_CITY: 'Eso es de otra ciudad.',
+  NO_WORK: 'Esa obra ya está terminada.',
+  LOT_NOT_NEGLECTED: 'Este lote está bien cuidado.',
+  CARE_LIMIT: 'Este lote ya recibió todos los cuidados posibles.',
+  GIFT_TOO_SMALL: 'El regalo mínimo es de 5 unidades.',
+  BAD_AMOUNT: 'Las cantidades no pueden ser negativas.',
+  NOT_ADMIN: 'Esto es solo para el equipo.',
+  // Derivados de restricciones de la base (ver codeOf).
+  ALREADY_HELPED: 'Ya ayudaste en esta obra.',
+  LOT_NAME_TAKEN: 'Ese nombre ya lo usa otro lote.',
+  DISPLAY_NAME_TAKEN: 'Ese apodo ya lo usa otra persona.',
+  NAME_LENGTH: 'Tiene que tener entre 2 y 24 caracteres.',
+  UNKNOWN: 'Algo salió mal. Probá de nuevo en un rato.',
+};
+
+// Violaciones de restricciones que el contrato no convierte en código propio.
+const CONSTRAINTS: Record<string, string> = {
+  construction_helps_pkey: 'ALREADY_HELPED',
+  lots_city_id_name_key: 'LOT_NAME_TAKEN',
+  players_city_id_display_name_key: 'DISPLAY_NAME_TAKEN',
+  lots_name_check: 'NAME_LENGTH',
+  players_display_name_check: 'NAME_LENGTH',
+};
+
+export class GameError extends Error {
+  constructor(public code: string) {
+    super(MESSAGES[code] ?? MESSAGES.UNKNOWN);
+    this.name = 'GameError';
+  }
+}
+
+type PgError = { message?: string; code?: string };
+
+export function codeOf(error: PgError): string {
+  const message = error.message ?? '';
+  if (message in MESSAGES) return message;
+  for (const [constraint, code] of Object.entries(CONSTRAINTS)) {
+    if (message.includes(`"${constraint}"`)) return code;
+  }
+  return 'UNKNOWN';
+}
+
+export function messageOf(e: unknown): string {
+  return e instanceof GameError ? e.message : MESSAGES.UNKNOWN;
+}

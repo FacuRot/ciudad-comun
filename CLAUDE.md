@@ -38,7 +38,7 @@ cd web && npm run build
 psql "$DATABASE_URL" -f tests/rpc.sql    # pruebas de funciones
 ```
 
-Sin CLI ni psql instalados: `npx supabase ...` y `docker exec -i supabase_db_CiudadComun psql -U postgres -q < tests/rpc.sql`. Los tests asumen una base recién reseteada y terminan en rollback. El magic link local llega a Mailpit: http://127.0.0.1:54324.
+Proyecto en la nube: `ciudad-comun` (ref `ublcrfhnysqpegzmywwi`, sa-east-1). Sin CLI global ni psql: `npx supabase ...`. Los tests corren con `npx supabase db query --linked -f tests/rpc.sql` (o por el MCP de Supabase); asumen el seed sin jugadores y terminan en rollback, así que sirven antes de registrar gente o contra una base local recién reseteada. En local (Docker), el magic link llega a Mailpit: http://127.0.0.1:54324.
 
 ## Convenciones
 

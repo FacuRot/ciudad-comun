@@ -1,7 +1,7 @@
 // Dibuja la ciudad entera en cada cuadro. Sin optimizaciones: son ~100 celdas.
 import type { MapBarrio as Barrio, MapLot as Lot, MapWork as PublicWork } from '../types/game';
 import { workPercent, type Cell } from '../game/geo';
-import { BUILDING_GLYPH } from '../game/format';
+import { BUILDING_GLYPH, formatRemaining } from '../game/format';
 import type { Layout } from './layout';
 import { ABANDONED, desaturate, lotColor, mix } from './colors';
 import { phaseAt, type Phase } from './time';
@@ -14,6 +14,7 @@ export type Scene = {
   lots: Lot[];
   works: PublicWork[];
   barrios: Barrio[];
+  constructions?: { lot_id: string; ends_at: string }[]; // solo las en curso
   timezone: string;
   myLotId?: string | null;
   selectedLotId?: string | null;
@@ -28,6 +29,7 @@ const THEME: Record<Phase, { ground: string; street: string; ink: string; overla
 };
 
 const ACCENT = '#2b8a80';
+const WORKING = '#e8910c';
 // Lado del edificio respecto del tile, por nivel (0 = sin edificio).
 const BUILDING_SIZE = [0, 0.42, 0.58, 0.74];
 
@@ -79,6 +81,14 @@ export function drawScene(ctx: CanvasRenderingContext2D, layout: Layout, scene: 
     }
   }
 
+  // Construcciones en curso, por encima del filtro para que se vean también de noche.
+  const building = new Map((scene.constructions ?? []).map((c) => [c.lot_id, Date.parse(c.ends_at)]));
+  for (const lot of scene.lots) {
+    if (!building.has(lot.id)) continue;
+    const { px, py } = at(lot);
+    drawWorking(ctx, px, py, t, now);
+  }
+
   // Textos por encima del filtro de noche.
   for (const work of scene.works) {
     const { px, py } = at(work);
@@ -105,7 +115,69 @@ export function drawScene(ctx: CanvasRenderingContext2D, layout: Layout, scene: 
     ctx.strokeStyle = night ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.35)';
     ctx.lineWidth = 1.5;
     ctx.strokeRect(px + 0.75, py + 0.75, t - 1.5, t - 1.5);
+
+    // Reloj con lo que falta sobre la construcción que está bajo el cursor (o el dedo).
+    const lot = scene.lots.find((l) => l.x === scene.hovered!.x && l.y === scene.hovered!.y);
+    const endsAt = lot ? building.get(lot.id) : undefined;
+    if (endsAt !== undefined) drawClock(ctx, px, py, t, endsAt - now);
   }
+}
+
+// Dos trazos que dan una vuelta al lote cada 4 segundos.
+function drawWorking(ctx: CanvasRenderingContext2D, px: number, py: number, t: number, now: number) {
+  const pad = t * 0.07;
+  const s = t - pad * 2;
+  const r = t * 0.08;
+  const perimeter = 4 * (s - 2 * r) + 2 * Math.PI * r;
+  const seg = perimeter * 0.16;
+  ctx.save();
+  ctx.lineWidth = Math.max(2, t * 0.045);
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+  roundRect(ctx, px + pad, py + pad, s, s, r);
+  ctx.stroke();
+  ctx.strokeStyle = WORKING;
+  ctx.setLineDash([seg, perimeter / 2 - seg]);
+  ctx.lineDashOffset = -((now % 4000) / 4000) * perimeter;
+  ctx.stroke();
+  ctx.restore();
+}
+
+// Pastilla con un reloj y el tiempo restante, arriba del lote (abajo si no entra).
+function drawClock(ctx: CanvasRenderingContext2D, px: number, py: number, t: number, left: number) {
+  const text = formatRemaining(left);
+  const fs = Math.max(11, Math.round(t * 0.2));
+  ctx.save();
+  ctx.font = `600 ${fs}px system-ui, sans-serif`;
+  const r = fs * 0.45;
+  const h = fs * 1.7;
+  const w = fs * 0.5 + r * 2 + fs * 0.4 + ctx.measureText(text).width + fs * 0.6;
+  const x = Math.max(4, Math.min(px + t / 2 - w / 2, ctx.canvas.clientWidth - w - 4));
+  const above = py - h - t * 0.06;
+  const y = above >= 4 ? above : py + t + t * 0.06;
+
+  ctx.fillStyle = 'rgba(30, 30, 28, 0.92)';
+  roundRect(ctx, x, y, w, h, h / 2);
+  ctx.fill();
+
+  const cx = x + fs * 0.5 + r;
+  const cy = y + h / 2;
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = Math.max(1.2, fs * 0.1);
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.moveTo(cx, cy);
+  ctx.lineTo(cx, cy - r * 0.65);
+  ctx.moveTo(cx, cy);
+  ctx.lineTo(cx + r * 0.5, cy);
+  ctx.stroke();
+
+  ctx.fillStyle = '#fff';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, cx + r + fs * 0.4, cy + 1);
+  ctx.restore();
 }
 
 function drawLot(ctx: CanvasRenderingContext2D, lot: Lot, px: number, py: number, t: number, scene: Scene, now: number) {

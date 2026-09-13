@@ -63,16 +63,21 @@ export function CityCanvas({ scene, onCellClick, tooltip }: Props) {
 
   const tip = hover && tooltip ? tooltip(hover.cell) : null;
 
+  // Con el dedo no hay hover: tocar una celda la deja marcada hasta tocar otra.
+  const track = (e: React.PointerEvent) => {
+    const { cell, px, py } = locate(e);
+    hoverRef.current = cell;
+    setHover(cell ? { cell, px, py } : null);
+  };
+
   return (
     <div ref={wrapRef} className="city-canvas">
       <canvas
         ref={canvasRef}
-        onPointerMove={(e) => {
-          const { cell, px, py } = locate(e);
-          hoverRef.current = cell;
-          setHover(cell ? { cell, px, py } : null);
-        }}
-        onPointerLeave={() => {
+        onPointerMove={track}
+        onPointerDown={track}
+        onPointerLeave={(e) => {
+          if (e.pointerType === 'touch') return;
           hoverRef.current = null;
           setHover(null);
         }}

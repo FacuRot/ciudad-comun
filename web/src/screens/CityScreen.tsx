@@ -36,9 +36,17 @@ function CityScreen() {
 
   const view = useMemo(() => {
     if (!snapshot) return null;
-    const { lots, works, barrios, players, city } = snapshot;
+    const { lots, works, barrios, constructions, players, city } = snapshot;
     const myLot = lots.find((l) => l.owner_id === me.id) ?? null;
-    const scene: Scene = { ...gridSize(lots, works), lots, works, barrios, timezone: city.timezone, myLotId: myLot?.id };
+    const scene: Scene = {
+      ...gridSize(lots, works),
+      lots,
+      works,
+      barrios,
+      constructions,
+      timezone: city.timezone,
+      myLotId: myLot?.id,
+    };
     const names = new Map(players.map((p) => [p.id, p.display_name]));
 
     const tooltip = (cell: Cell) => {

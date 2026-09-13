@@ -69,9 +69,11 @@ Una ladrillería nivel 1 produce 48 ladrillos por día. Un nivel 2 necesita 70 m
 
 | Nivel | Ladrillo | Madera | Energía | Jornadas | Duración |
 |-------|----------|--------|---------|----------|----------|
-| 1 | 15 | 10 | 0 | 1 | 4 h |
-| 2 | 30 | 25 | 15 | 1 | 6 h |
-| 3 | 60 | 50 | 40 | 1 | 12 h |
+| 1 | 15 | 10 | 0 | 1 | 2 h |
+| 2 | 30 | 25 | 15 | 1 | 3 h |
+| 3 | 60 | 50 | 40 | 1 | 6 h |
+
+Tiempos reducidos a la mitad el 13/09/2026 (antes 4 / 6 / 12 h, con ayuda de −2 h).
 
 La plaza usa la misma tabla. Los materiales se descuentan al iniciar la construcción; no se devuelven.
 
@@ -90,11 +92,11 @@ tasa_efectiva = tasa_base(nivel)
 
 | Parámetro | Valor | Clave |
 |-----------|-------|-------|
-| Reducción por ayuda | 2 horas | `help.hours_reduced` |
+| Reducción por ayuda | 1 hora | `help.hours_reduced` |
 | Ayudas máximas por jugador por construcción | 1 | `help.max_per_helper` |
 
 - Cuesta 1 jornada. No se puede ayudar la propia construcción.
-- Si al restar 2 horas el tiempo restante queda en cero o menos, la construcción se completa en el acto.
+- Si al restar 1 hora el tiempo restante queda en cero o menos, la construcción se completa en el acto.
 - El ayudante queda registrado en el evento y aparece en el resumen del dueño.
 
 ## 5. Obras públicas
@@ -219,12 +221,12 @@ Todos son idempotentes: correrlos dos veces no produce efectos dobles.
     "types": ["ladrilleria", "aserradero", "generador", "plaza"],
     "produces": { "ladrilleria": "ladrillo", "aserradero": "madera", "generador": "energia", "plaza": null },
     "levels": {
-      "1": { "cost": { "ladrillo": 15, "madera": 10, "energia": 0 },  "hours": 4 },
-      "2": { "cost": { "ladrillo": 30, "madera": 25, "energia": 15 }, "hours": 6 },
-      "3": { "cost": { "ladrillo": 60, "madera": 50, "energia": 40 }, "hours": 12 }
+      "1": { "cost": { "ladrillo": 15, "madera": 10, "energia": 0 },  "hours": 2 },
+      "2": { "cost": { "ladrillo": 30, "madera": 25, "energia": 15 }, "hours": 3 },
+      "3": { "cost": { "ladrillo": 60, "madera": 50, "energia": 40 }, "hours": 6 }
     }
   },
-  "help": { "hours_reduced": 2, "max_per_helper": 1 },
+  "help": { "hours_reduced": 1, "max_per_helper": 1 },
   "care": { "days_added": 2, "max_per_absence": 3, "min_state": "descuidado" },
   "decay": { "descuidado_after_days": 4, "abandonado_after_days": 8 },
   "gift": { "min_amount": 5 },

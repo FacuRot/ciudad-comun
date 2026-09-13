@@ -30,7 +30,7 @@ Estimación base: 10 a 12 horas por semana. Con Claude Code haciendo el grueso d
 - Realtime sobre `lots` y `constructions`, con fallback de polling.
 - Recarga diaria de jornadas.
 
-**Listo cuando:** construyo un nivel 1, a las 4 horas el lote sube de nivel solo, al volver tengo materiales nuevos, y otra persona lo ve cambiar sin refrescar.
+**Listo cuando:** construyo un nivel 1, a las 2 horas el lote sube de nivel solo, al volver tengo materiales nuevos, y otra persona lo ve cambiar sin refrescar.
 
 ## Semana 3 · El loop colectivo
 

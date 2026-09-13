@@ -66,7 +66,7 @@ Barra superior: jornadas (con puntos llenos/vacíos, 6 posiciones) e inventario.
 
 - Nombre del lote (editable inline) y color (muestras).
 - Edificio actual: tipo, nivel, tasa de producción efectiva por hora con desglose ("2/h base · +10 % plaza vecina").
-- Si no hay edificio: selector de tipo con la frase "En tu barrio escasea: **energía**" calculada en el cliente (material con menor producción total del barrio). Costo del nivel 1 y botón "Construir (1 jornada, 4 h)".
+- Si no hay edificio: selector de tipo con la frase "En tu barrio escasea: **energía**" calculada en el cliente (material con menor producción total del barrio). Costo del nivel 1 y botón "Construir (1 jornada, 2 h)".
 - Si hay edificio y nivel < 3: costo del siguiente nivel, materiales que faltan en rojo, botón "Mejorar". Si faltan materiales, debajo: "Pediles a tus vecinos" con la lista de quiénes producen ese material en el barrio.
 - Si hay construcción en curso: tiempo restante, quiénes ayudaron.
 - Sección "Quién pasó por acá": visitas de los últimos 7 días.
@@ -78,7 +78,7 @@ Al abrirse llama a `visit_lot`.
 - Nombre del lote, apodo del dueño, "por acá desde el 14 de sep", tipo y nivel.
 - Estado con explicación humana: "Activo", "Hace 5 días que no viene" (descuidado), "Abandonado hace 9 días".
 - Acciones según estado:
-  - Construcción en curso → "Ayudar (1 jornada, −2 h)". Deshabilitado si ya ayudó.
+  - Construcción en curso → "Ayudar (1 jornada, −1 h)". Deshabilitado si ya ayudó.
   - `descuidado` / `abandonado` → "Cuidar (1 jornada, +2 días)". Muestra cuidados restantes.
   - Siempre → "Regalar materiales": selector de material, cantidad (mínimo 5, máximo lo que tengo), botón.
 
@@ -130,9 +130,9 @@ Este es el recorrido que el diseño intenta producir. Sirve para probar a mano a
 1. Recibo por WhatsApp un link de alguien que conozco. Lo abro en el celular. Veo un mapa con colores y una tarjeta con el nombre de quien me invitó. Pongo mi email.
 2. Abro el email, toco el link, vuelvo al mapa. Ahora hay lotes con borde punteado y uno o dos que pulsan al lado del lote de mi amigo. Toco uno.
 3. Pongo un apodo, un nombre para el lote, elijo un color. "Fundar acá". El lote aparece con mi color. Tengo 3 jornadas y un kit de materiales.
-4. Se abre el panel de mi lote. Dice que en el barrio escasea energía. Elijo generador. "Construir (1 jornada, 4 h)". El lote tiene borde animado. Me quedan 2 jornadas.
+4. Se abre el panel de mi lote. Dice que en el barrio escasea energía. Elijo generador. "Construir (1 jornada, 2 h)". El lote tiene borde animado. Me quedan 2 jornadas.
 5. El pie del mapa dice "Escuela 62 %". La toco. Veo la barra, la placa con nombres, un formulario prellenado con mis 10 de energía. "Aportar (1 jornada)". La barra sube un poco y mi apodo aparece en la lista. Me queda 1 jornada.
-6. Toco el lote de mi amigo. Veo que está construyendo. "Ayudar (1 jornada, −2 h)". Lo hago. Me quedan 0.
-7. Cierro. Cuatro horas después me llega un email: "Tu generador está listo". Entro. Modal: "Tu generador subió a nivel 1. Marta ayudó en tu construcción. 2 vecinos pasaron por tu lote."
+6. Toco el lote de mi amigo. Veo que está construyendo. "Ayudar (1 jornada, −1 h)". Lo hago. Me quedan 0.
+7. Cierro. Dos horas después me llega un email: "Tu generador está listo". Entro. Modal: "Tu generador subió a nivel 1. Marta ayudó en tu construcción. 2 vecinos pasaron por tu lote."
 
 Si en el paso 7 la persona vuelve a entrar al día siguiente por su cuenta, el diseño funcionó.

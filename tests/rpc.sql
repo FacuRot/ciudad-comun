@@ -108,7 +108,8 @@ select build('generador');
 select pg_temp.ok((select jornadas = 2 from players where id = '11111111-1111-1111-1111-111111111111'), 'build gasta 1 jornada');
 select pg_temp.ok((select (ladrillo, madera, energia) = (5, 10, 10) from inventories where player_id = '11111111-1111-1111-1111-111111111111'),
                   'build gasta el costo del nivel 1');
-select pg_temp.ok((select ends_at - started_at = interval '4 hours' from constructions where completed_at is null), 'el nivel 1 tarda 4 h');
+select pg_temp.ok((select ends_at - started_at = (config #>> '{buildings,levels,1,hours}')::numeric * interval '1 hour'
+                     from constructions, cities where completed_at is null), 'el nivel 1 tarda lo que dice la config');
 select pg_temp.err($$select build('generador')$$, 'ALREADY_BUILDING');
 
 -- ---------------------------------------------------------------------
@@ -118,8 +119,10 @@ select pg_temp.err($$select help_construction((select id from constructions wher
 
 select pg_temp.as_user('22222222-2222-2222-2222-222222222222');
 select pg_temp.err($$select help_construction(gen_random_uuid())$$, 'NO_CONSTRUCTION');
-select pg_temp.ok((help_construction((select id from constructions where completed_at is null))).ends_at - now() = interval '2 hours',
-                  'help_construction resta 2 h');
+select pg_temp.ok((help_construction((select id from constructions where completed_at is null))).ends_at - now()
+                  = (select ((config #>> '{buildings,levels,1,hours}')::numeric - (config #>> '{help,hours_reduced}')::numeric)
+                            * interval '1 hour' from cities),
+                  'help_construction resta help.hours_reduced');
 select pg_temp.err($$select help_construction((select id from constructions where completed_at is null))$$, '23505');  -- ya ayudó
 select pg_temp.ok((select jornadas = 2 from players where id = '22222222-2222-2222-2222-222222222222'),
                   'ayudar gasta 1 jornada (la ayuda repetida no)');

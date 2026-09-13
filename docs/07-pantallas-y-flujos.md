@@ -1,0 +1,138 @@
+# 07 · Pantallas y flujos
+
+El prototipo tiene **una pantalla principal** (la ciudad) con paneles laterales, más una pantalla de entrada y un panel de administración. Todo funciona en navegador de escritorio y móvil; en móvil los paneles ocupan la parte inferior.
+
+## Mapa de pantallas
+
+```
+/join/:token  ──login──▶  /join/:token (elegir lote)  ──claim──▶  /city
+                                                                   ├── panel: Mi lote
+                                                                   ├── panel: Lote ajeno
+                                                                   ├── panel: Obra pública
+                                                                   ├── panel: Barrio (qué falta)
+                                                                   ├── modal: Mientras no estabas
+                                                                   └── modal: Invitar
+/admin  (solo is_admin)
+```
+
+## 1. Entrada · `/join/:token`
+
+**Estado A — sin sesión.** Muestra el mapa de la ciudad de fondo (solo lectura, con los colores reales) y encima una tarjeta: "*Nombre del invitador* te invitó a *Ciudad Común*". Un campo de email y un botón "Entrar". Al enviar, Supabase manda el magic link; la tarjeta dice "Revisá tu email".
+
+Si el token no es válido: "Esta invitación ya no sirve. Pedile otra a quien te invitó." Sin formulario.
+
+**Estado B — con sesión, sin lote.** El mapa se vuelve interactivo. Los lotes libres que se pueden tomar (distancia ≤ 2 de un vecino activo) se ven con un borde punteado y los adyacentes al lote del invitador con un pulso suave. Los lotes libres que no se pueden tomar se ven apagados. Al tocar uno válido se abre la tarjeta de fundación:
+
+- Apodo (2–24 caracteres; visible para todos)
+- Nombre del lote (2–24)
+- Color (8 muestras)
+- Botón "Fundar acá"
+
+Al confirmar, `claim_lot`. Si falla con `LOT_NOT_FREE`, el mapa se refresca y se pide elegir otro.
+
+**Estado C — con sesión y lote.** Redirige a `/city`.
+
+## 2. La ciudad · `/city`
+
+### Layout
+
+```
+┌─────────────────────────────────────────────────┬──────────────┐
+│ ● 3 jornadas   ▪ 32 ladrillo ▪ 15 madera ▪ 8 en │  [Panel]     │
+│                                                 │              │
+│              [ canvas del mapa ]                │  Mi lote /   │
+│                                                 │  Lote ajeno /│
+│                                                 │  Obra /      │
+│  Barrio Fundadores · 31/41 · Escuela 62 %       │  Barrio      │
+└─────────────────────────────────────────────────┴──────────────┘
+```
+
+Barra superior: jornadas (con puntos llenos/vacíos, 6 posiciones) e inventario. Pie del mapa: nombre del barrio visible, ocupación, progreso de la obra. Botón "Invitar" arriba a la derecha.
+
+### El canvas
+
+- Grilla 12×8, tile de tamaño fijo, calles en gris.
+- Cada lote es un rectángulo del color elegido por el dueño. El nivel se ve por el tamaño del rectángulo interior (nivel 1 chico, nivel 3 casi lleno) y por una sombra en la base.
+- Tipo de edificio: un glifo simple en el centro (■ ladrillería, ▲ aserradero, ⚡ generador, ✿ plaza). Sin sprites.
+- Estado: `activo` color pleno; `descuidado` color desaturado al 50 % con un ícono de pasto; `abandonado` gris con ícono de "cuidar" (una mano) visible.
+- Construcción en curso: borde animado (línea que gira) y un pequeño reloj con el tiempo restante al hacer hover o tocar.
+- Obra pública: celda distinta (más grande visualmente, con borde doble) y una barra de progreso dibujada en la parte inferior.
+- Lotes libres: borde punteado tenue. Lotes de barrio cerrado: casi invisibles, con el nombre del barrio en gris y "se abre pronto".
+- Día/noche: el fondo del canvas cambia según la hora de la ciudad; de noche los lotes `activo` muestran 1 a 3 puntos amarillos (ventanas).
+- Hover/tap sobre un lote: tooltip con nombre del lote y apodo del dueño. Click: abre el panel correspondiente.
+- Redibujo total en cada cambio de estado. Sin optimización.
+
+### Panel: Mi lote
+
+- Nombre del lote (editable inline) y color (muestras).
+- Edificio actual: tipo, nivel, tasa de producción efectiva por hora con desglose ("2/h base · +10 % plaza vecina").
+- Si no hay edificio: selector de tipo con la frase "En tu barrio escasea: **energía**" calculada en el cliente (material con menor producción total del barrio). Costo del nivel 1 y botón "Construir (1 jornada, 4 h)".
+- Si hay edificio y nivel < 3: costo del siguiente nivel, materiales que faltan en rojo, botón "Mejorar". Si faltan materiales, debajo: "Pediles a tus vecinos" con la lista de quiénes producen ese material en el barrio.
+- Si hay construcción en curso: tiempo restante, quiénes ayudaron.
+- Sección "Quién pasó por acá": visitas de los últimos 7 días.
+
+### Panel: Lote ajeno
+
+Al abrirse llama a `visit_lot`.
+
+- Nombre del lote, apodo del dueño, "por acá desde el 14 de sep", tipo y nivel.
+- Estado con explicación humana: "Activo", "Hace 5 días que no viene" (descuidado), "Abandonado hace 9 días".
+- Acciones según estado:
+  - Construcción en curso → "Ayudar (1 jornada, −2 h)". Deshabilitado si ya ayudó.
+  - `descuidado` / `abandonado` → "Cuidar (1 jornada, +2 días)". Muestra cuidados restantes.
+  - Siempre → "Regalar materiales": selector de material, cantidad (mínimo 5, máximo lo que tengo), botón.
+
+### Panel: Obra pública
+
+- Nombre, barrio, efecto al completarse.
+- Cuatro barras: ladrillo, madera, energía, jornadas, con "falta N".
+- Formulario de aporte: tres campos numéricos prellenados con `min(lo que tengo, lo que falta)`, botón "Aportar (1 jornada)". Se puede aportar con los tres campos en cero.
+- Placa: lista de contribuyentes ordenada por cantidad de aportes, con el propio destacado. Cuando la obra se completa, la placa queda fija con el título "La construyeron".
+
+### Panel: Barrio (qué falta)
+
+Se abre desde el pie del mapa. Muestra: producción total del barrio por material, cuántos lotes de cada tipo hay, cuántos lotes libres, y la obra con su progreso. Es la pantalla que le dice a un nuevo qué construir y a un veterano a quién ayudar.
+
+### Modal: Mientras no estabas
+
+Aparece al entrar si `heartbeat().show_summary`. Lista de líneas, con el orden de prioridad de `05-reglas-y-parametros.md` §11:
+
+> Tu **aserradero** subió a nivel 2.
+> **Marta** ayudó en tu construcción.
+> **Julián** te regaló 20 de energía.
+> La **Escuela** avanzó del 40 % al 62 %.
+> **3 vecinos** pasaron por tu lote.
+> Recogiste **46 de madera**.
+
+Un solo botón: "Ver la ciudad". Máximo 8 líneas; si hay más, "y 4 cosas más" que expande.
+
+### Modal: Invitar
+
+Genera el token, muestra la URL y un botón de copiar y otro de compartir por WhatsApp (`https://wa.me/?text=...`). Texto sugerido: "Te guardé un lote al lado del mío en Ciudad Común: <url>".
+
+### Avisos en vivo
+
+Un toast discreto en la esquina cuando llega un evento dirigido al jugador por Realtime (ayuda recibida, regalo, obra completada, barrio abierto). Se apila, desaparece a los 6 segundos.
+
+## 3. Administración · `/admin`
+
+Solo `is_admin`. Una página sin diseño:
+
+- Tarjeta con `admin_city_stats()`: jugadores, activos hoy, lotes por estado, construcciones activas, obras, avisos pendientes, nuevos en 24 h (para hacer de padrino).
+- Botón "Abrir Barrio del Río" con confirmación.
+- Tabla de `notifications_outbox` pendientes con botón "Marcar enviado" por fila, para el modo manual.
+- Lista de invitaciones sin usar con sus URLs, para repartir.
+
+## Flujo de la primera sesión (guion)
+
+Este es el recorrido que el diseño intenta producir. Sirve para probar a mano antes de invitar a nadie.
+
+1. Recibo por WhatsApp un link de alguien que conozco. Lo abro en el celular. Veo un mapa con colores y una tarjeta con el nombre de quien me invitó. Pongo mi email.
+2. Abro el email, toco el link, vuelvo al mapa. Ahora hay lotes con borde punteado y uno o dos que pulsan al lado del lote de mi amigo. Toco uno.
+3. Pongo un apodo, un nombre para el lote, elijo un color. "Fundar acá". El lote aparece con mi color. Tengo 3 jornadas y un kit de materiales.
+4. Se abre el panel de mi lote. Dice que en el barrio escasea energía. Elijo generador. "Construir (1 jornada, 4 h)". El lote tiene borde animado. Me quedan 2 jornadas.
+5. El pie del mapa dice "Escuela 62 %". La toco. Veo la barra, la placa con nombres, un formulario prellenado con mis 10 de energía. "Aportar (1 jornada)". La barra sube un poco y mi apodo aparece en la lista. Me queda 1 jornada.
+6. Toco el lote de mi amigo. Veo que está construyendo. "Ayudar (1 jornada, −2 h)". Lo hago. Me quedan 0.
+7. Cierro. Cuatro horas después me llega un email: "Tu generador está listo". Entro. Modal: "Tu generador subió a nivel 1. Marta ayudó en tu construcción. 2 vecinos pasaron por tu lote."
+
+Si en el paso 7 la persona vuelve a entrar al día siguiente por su cuenta, el diseño funcionó.

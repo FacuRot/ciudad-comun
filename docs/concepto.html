@@ -1,0 +1,301 @@
+<title>Ciudad Común</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Instrument+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<style>
+  :root{
+    --bg:#EEF1F5; --paper:#F7F8FA; --ink:#1B2430; --ink-2:#4A5563; --ink-3:#7A8594;
+    --line:#D3D9E1; --amber:#D9962E; --amber-soft:#F5E4C3; --teal:#2E8B8B; --brick:#B4553F;
+    --tile-active:#D9962E; --tile-neglect:#B7A47C; --tile-aband:#8C8C8C; --tile-ruin:#5E5A55; --tile-free:#D3D9E1; --tile-green:#6FA88A; --tile-ind:#7C8BA5;
+    --shadow:0 1px 0 rgba(27,36,48,.06);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#141B26; --paper:#1B2331; --ink:#E6EAF0; --ink-2:#B4BCC8; --ink-3:#7F8A99;
+      --line:#2C3644; --amber:#E8AC48; --amber-soft:#3A2F1A; --teal:#5FB5B0; --brick:#D9765F;
+      --tile-active:#E8AC48; --tile-neglect:#8A7C5C; --tile-aband:#5A6068; --tile-ruin:#3A3F47; --tile-free:#2C3644; --tile-green:#4E8A6C; --tile-ind:#5C6B85;
+      --shadow:none;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#141B26; --paper:#1B2331; --ink:#E6EAF0; --ink-2:#B4BCC8; --ink-3:#7F8A99;
+    --line:#2C3644; --amber:#E8AC48; --amber-soft:#3A2F1A; --teal:#5FB5B0; --brick:#D9765F;
+    --tile-active:#E8AC48; --tile-neglect:#8A7C5C; --tile-aband:#5A6068; --tile-ruin:#3A3F47; --tile-free:#2C3644; --tile-green:#4E8A6C; --tile-ind:#5C6B85;
+    --shadow:none;
+  }
+  *{box-sizing:border-box}
+  body{background:var(--bg);color:var(--ink);font-family:"Instrument Sans",system-ui,-apple-system,"Segoe UI",sans-serif;font-size:16px;line-height:1.55;padding-inline:20px;padding-block:0 64px}
+  .wrap{max-width:760px;margin:0 auto}
+  h1,h2,h3,.eyebrow,.tag{font-family:"Barlow Condensed","Arial Narrow",Arial,sans-serif}
+  h1{font-size:clamp(44px,8vw,68px);line-height:.95;font-weight:700;letter-spacing:-.01em;margin:0;text-wrap:balance}
+  h2{font-size:26px;line-height:1.05;font-weight:600;margin:0 0 10px;text-wrap:balance}
+  h3{font-size:18px;font-weight:600;margin:0 0 4px;letter-spacing:.01em}
+  p{margin:0 0 12px;max-width:66ch}
+  p:last-child{margin-bottom:0}
+  strong{font-weight:600}
+  .eyebrow{text-transform:uppercase;letter-spacing:.12em;font-size:13px;font-weight:600;color:var(--amber)}
+  header{padding-block:40px 24px;border-bottom:1px solid var(--line)}
+  .kicker{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:baseline;margin-bottom:14px}
+  .kicker .meta{color:var(--ink-3);font-size:13px}
+  .lede{font-size:19px;line-height:1.45;color:var(--ink-2);margin-top:18px;max-width:60ch}
+  .lede b{color:var(--ink);font-weight:600}
+  #city{display:block;width:100%;height:auto;max-width:100%;border-radius:4px;margin-top:26px}
+  .cap{font-size:12.5px;color:var(--ink-3);margin-top:8px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+  section{padding-block:30px;border-bottom:1px solid var(--line)}
+  section:last-of-type{border-bottom:0}
+  .grid{display:grid;grid-template-columns:150px 1fr;gap:16px 28px;align-items:start}
+  @media (max-width:560px){.grid{grid-template-columns:1fr;gap:6px}}
+  .grid .eyebrow{padding-top:6px}
+  .pilares{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:6px}
+  @media (max-width:640px){.pilares{grid-template-columns:1fr}}
+  .pilar{background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:16px 16px 14px;box-shadow:var(--shadow)}
+  .pilar h3{color:var(--ink);font-size:20px}
+  .pilar p{font-size:14.5px;color:var(--ink-2);line-height:1.5}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:20px 28px}
+  @media (max-width:600px){.two{grid-template-columns:1fr}}
+  .moneda h3{display:flex;align-items:center;gap:8px}
+  .chip{display:inline-block;width:12px;height:12px;border-radius:50%;background:var(--amber)}
+  .chip.sq{border-radius:2px;background:var(--teal)}
+  .estados{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin:14px 0 6px;font-size:13px}
+  @media (max-width:600px){.estados{grid-template-columns:repeat(2,1fr)}}
+  .estado{display:flex;flex-direction:column;gap:6px}
+  .estado .sw{height:28px;border-radius:3px;position:relative;overflow:hidden}
+  .estado .sw i{position:absolute;width:5px;height:5px;background:rgba(255,255,255,.75);border-radius:1px;top:8px}
+  .estado .sw i:nth-child(1){left:8px}.estado .sw i:nth-child(2){left:17px}.estado .sw i:nth-child(3){left:26px}
+  .estado .dias{color:var(--ink-3);font-family:"Barlow Condensed",Arial,sans-serif;text-transform:uppercase;letter-spacing:.08em;font-size:11.5px}
+  .estado .n{font-weight:600}
+  .estado .d{color:var(--ink-2);font-size:12.5px;line-height:1.35}
+  ol.sesion{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:12px;counter-reset:paso}
+  ol.sesion li{display:grid;grid-template-columns:38px 1fr;gap:12px;align-items:start}
+  ol.sesion li::before{counter-increment:paso;content:counter(paso);font-family:"Barlow Condensed",Arial,sans-serif;font-weight:700;font-size:22px;line-height:1;color:var(--amber);padding-top:2px;font-variant-numeric:tabular-nums}
+  ol.sesion li p{font-size:15px}
+  .regla{background:var(--amber-soft);border-left:3px solid var(--amber);padding:12px 14px;border-radius:0 4px 4px 0;margin-top:14px;font-size:15px}
+  .regla p{max-width:none}
+  .lista{margin:6px 0 0;padding:0;list-style:none;display:grid;gap:10px}
+  .lista li{padding-left:16px;position:relative;font-size:15px;max-width:66ch}
+  .lista li::before{content:"";position:absolute;left:0;top:.6em;width:7px;height:7px;background:var(--amber);border-radius:1px}
+  .lista.fuera li::before{background:var(--ink-3)}
+  .tag{display:inline-block;font-size:12px;text-transform:uppercase;letter-spacing:.1em;font-weight:600;color:var(--ink-3);border:1px solid var(--line);border-radius:3px;padding:2px 7px;margin-left:8px;vertical-align:middle}
+  footer{padding-top:24px;color:var(--ink-3);font-size:13px}
+  @media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div class="wrap">
+<header>
+  <div class="kicker">
+    <span class="eyebrow">Documento de concepto</span>
+    <span class="meta">v0.2 · septiembre 2026 · nombre provisorio</span>
+  </div>
+  <h1>Ciudad Común</h1>
+  <p class="lede">Un city builder de navegador donde <b>cientos de personas construyen la misma ciudad</b>. Cada una tiene su lote; la ciudad es de todos. Se funda, crece, se consolida y queda como testimonio de quienes la levantaron.</p>
+  <canvas id="city" width="1440" height="360" aria-label="Mapa generado de una ciudad: lotes de colores vistos desde arriba, con luces según la hora"></canvas>
+  <div class="cap"><span>Vista cenital generada al azar. Las ventanas se prenden según la hora real de quien mira.</span><span id="hora"></span></div>
+</header>
+
+<section class="grid">
+  <span class="eyebrow">La frase</span>
+  <div>
+    <p><strong>r/place, pero es una ciudad y no se borra.</strong> Una sola pantalla que se explica sin tutorial, donde cada acción chica queda a la vista de todos y el resultado de meses de gente desconocida coordinándose se convierte en un lugar.</p>
+  </div>
+</section>
+
+<section class="grid">
+  <span class="eyebrow">La fantasía</span>
+  <div>
+    <p>Volver al tercer día y ver que la ciudad cambió. Que alguien construyó al lado tuyo, que el hospital que empujaste entre veinte se terminó, que tu nombre está en la placa. Ser parte de algo que existe porque hubo gente, y poder señalar qué parte pusiste vos.</p>
+    <p>El jugador no es un alcalde omnipotente: es un vecino con un lote, tres jornadas por día y un barrio que lo necesita.</p>
+  </div>
+</section>
+
+<section>
+  <span class="eyebrow">Pilares</span>
+  <div class="pilares">
+    <div class="pilar">
+      <h3>Lo nuestro es el corazón</h3>
+      <p>La promesa es la ciudad compartida. Toda decisión de diseño se evalúa primero por cuánto refuerza el espectáculo colectivo y la interdependencia entre vecinos.</p>
+    </div>
+    <div class="pilar">
+      <h3>Lo mío es el motor</h3>
+      <p>El lote propio, la producción acumulada y las construcciones con hora de fin son lo que trae al jugador de vuelta. Lo personal existe al servicio de lo colectivo y siempre se ve en el mapa.</p>
+    </div>
+    <div class="pilar">
+      <h3>Igualdad de influencia</h3>
+      <p>Cinco minutos a la noche pesan lo mismo que todo el día pegado. Las jornadas no se compran ni se acumulan sin límite; la comunidad se mantiene sana porque nadie domina el mapa.</p>
+    </div>
+  </div>
+</section>
+
+<section class="grid">
+  <span class="eyebrow">Unidad social</span>
+  <div>
+    <p><strong>Ciudades acotadas de 150 a 300 lotes</strong>, no una instancia global. Suficientemente chicas para reconocer nombres, suficientemente grandes para que existan barrios con identidad. El mapa se habilita por barrios a medida que el anterior se llena: siempre se ve denso y cada apertura es un evento.</p>
+    <p><strong>Ciclo de vida.</strong> Los primeros en entrar son fundadores y quedan marcados para siempre. Cuando la ciudad completa sus lotes y sus hitos colectivos pasa a <em>consolidada</em>: sigue existiendo, se visita, los lotes siguen siendo de sus dueños, pero ya no hay qué construir. El juego empuja entonces a fundar o sumarse a la siguiente, llevándose reputación y títulos. Temporadas sin reset.</p>
+    <p><strong>Entrada por elección.</strong> Se ve qué ciudades están abiertas, cuántos lotes quedan y qué les falta, o se llega por invitación directa al barrio de alguien. Nunca asignación al azar.</p>
+  </div>
+</section>
+
+<section>
+  <span class="eyebrow">Economía</span>
+  <h2>Dos monedas: una mide atención, otra mide interdependencia</h2>
+  <div class="two">
+    <div class="moneda">
+      <h3><span class="chip"></span>Jornadas</h3>
+      <p>Tres por día, iguales para todos, acumulables hasta dos días. No se compran ni se ganan jugando más. Una jornada es <em>hacer algo</em>: construir en el lote, ayudar una obra ajena, aportar a una obra pública, cuidar el lote de un vecino ausente.</p>
+    </div>
+    <div class="moneda">
+      <h3><span class="chip sq"></span>Materiales</h3>
+      <p>Pocos tipos (ladrillo, madera, acero, energía, comida). Cada lote produce uno solo, pasivamente, mientras el jugador no está. Casi ningún edificio se construye con un solo material: necesitás a alguien. Circulan por el mercado del barrio.</p>
+    </div>
+  </div>
+  <p style="margin-top:18px"><strong>Obras públicas.</strong> Hospital, puente, subte, estadio: nadie los construye, los construye el barrio. Una barra tipo Kickstarter dice qué falta ("400 ladrillos, 200 acero, 60 jornadas") y cualquiera aporta. Los contribuyentes quedan en la placa. Es el mecanismo que hace visible el esfuerzo colectivo y le da destino a lo que nadie compra.</p>
+  <p><strong>Hitos colectivos.</strong> Al llegar a cierta población o cobertura de servicios se desbloquean tiers nuevos para toda la ciudad. "Estuve cuando abrimos el puerto" es lo que la gente cuenta.</p>
+  <div class="regla"><p><strong>No negociable:</strong> las jornadas nunca se venden. Monetización exclusivamente cosmética (paletas, estilos arquitectónicos, elementos distintivos del lote).</p></div>
+</section>
+
+<section>
+  <span class="eyebrow">Ciclo del lote</span>
+  <h2>Se funda, crece, se cuida, decae, se hereda</h2>
+  <p>El mapa cuenta solo quién está y quién se fue. Un lote sin visitas atraviesa estados visibles antes de volver al pool, y vuelve <strong>con la ruina encima</strong>, nunca vacío.</p>
+  <div class="estados" role="list">
+    <div class="estado" role="listitem"><div class="sw" style="background:var(--tile-active)"><i></i><i></i><i></i></div><span class="dias">Días 0–3</span><span class="n">Activo</span><span class="d">Produce normal. Luces prendidas.</span></div>
+    <div class="estado" role="listitem"><div class="sw" style="background:var(--tile-neglect)"><i style="opacity:.4"></i><i style="opacity:.4"></i><i style="opacity:.4"></i></div><span class="dias">Días 4–7</span><span class="n">Descuidado</span><span class="d">Pasto crecido, media producción. Un aviso.</span></div>
+    <div class="estado" role="listitem"><div class="sw" style="background:var(--tile-aband)"></div><span class="dias">Días 8–14</span><span class="n">Abandonado</span><span class="d">Sin producción. Los vecinos pueden cuidarlo.</span></div>
+    <div class="estado" role="listitem"><div class="sw" style="background:var(--tile-ruin)"></div><span class="dias">Día 15+</span><span class="n">Ruina</span><span class="d">Vuelve al pool con la estructura encima.</span></div>
+    <div class="estado" role="listitem"><div class="sw" style="background:var(--tile-active);opacity:.85"><i></i><i></i></div><span class="dias">Nuevo dueño</span><span class="n">Heredado</span><span class="d">Restaurar es más barato que construir. Capas de historia.</span></div>
+  </div>
+  <p style="margin-top:16px"><strong>Cuidar.</strong> Durante el abandono, cualquier vecino gasta una jornada y frena el estado un par de días (máximo dos o tres veces). Genera un vínculo real entre desconocidos y protege a quien se fue de vacaciones sin programar un "modo ausente".</p>
+  <p><strong>El que vuelve no se castiga dos veces.</strong> En descuido o abandono, una jornada lo recupera entero. Si perdió el lote, conserva reputación, inventario, desbloqueos y su nombre en las placas, con prioridad para tomar un lote libre en la misma ciudad.</p>
+  <p><strong>Señal de barrio.</strong> Muchos lotes descuidados bajan el rendimiento de las obras públicas de la zona: los vecinos activos tienen un motivo propio para reclutar gente a su barrio.</p>
+</section>
+
+<section>
+  <span class="eyebrow">Primera sesión</span>
+  <h2>El tutorial es el juego; el primer maestro es un vecino real</h2>
+  <ol class="sesion">
+    <li><div><h3>La landing es el mapa en vivo</h3><p>Sin cuenta se navega la ciudad, se hace zoom, se leen placas, se ve gente construyendo. El registro aparece recién al tocar un lote libre y decir "quiero éste".</p></div></li>
+    <li><div><h3>Nunca un lote aislado</h3><p>El nuevo cae pegado a jugadores activos, o directo en el barrio de quien lo invitó. La soledad en el primer minuto mata más juegos sociales que cualquier bug.</p></div></li>
+    <li><div><h3>Vecino padrino</h3><p>El vecino activo más cercano recibe "tenés un vecino nuevo". Si le tira una jornada o materiales en 24 horas, los dos ganan algo. No es un rol: es cualquiera al que le conviene saludar.</p></div></li>
+    <li><div><h3>Tres jornadas con destino sugerido</h3><p>La primera nombra el lote y elige qué produce, mostrando qué escasea en el barrio. La segunda va a la obra pública: la barra se mueve y el nombre aparece en la lista. La tercera es libre.</p></div></li>
+    <li><div><h3>Salir con algo que termina hoy</h3><p>La primera construcción tarda 4 a 6 horas, nunca 24. Al volver, lo primero es el resumen de lo que pasó sin vos: la casa lista, el padrino te mandó madera, la escuela al 90 %, tres vecinos pasaron por tu lote.</p></div></li>
+  </ol>
+  <div class="regla"><p><strong>Criterio de éxito:</strong> a los cinco minutos, sin haber leído nada, el jugador responde qué es mío, qué es nuestro y quién está al lado.</p></div>
+</section>
+
+<section class="grid">
+  <span class="eyebrow">Estética</span>
+  <div>
+    <p><strong>Estilizado y legible desde arriba, antes que detallado de cerca.</strong> Vista cenital o isométrica plana, tiles, colores planos, formas simples (referencias: Townscaper, Mini Motorways, Dorfromantik). La captura que se comparte es la ciudad entera y tiene que verse increíble a ese zoom.</p>
+    <p>Los edificios <strong>crecen por niveles de forma procedural</strong>: pocos tipos, pocos niveles, una paleta, miles de combinaciones. La personalización va por color y estilo, no por detalle, y es lo que después se vende como cosmético. Ciclo día/noche con la hora real de la ciudad y ventanas encendidas donde hay gente.</p>
+    <p>Técnicamente, 2D en canvas o WebGL con tiles: corre en cualquier navegador y celular, las actualizaciones en tiempo real son deltas chicos, y se arranca con geometría pura para sumar arte después sin rehacer nada. Se evita 3D y pixel art detallado.</p>
+  </div>
+</section>
+
+<section>
+  <span class="eyebrow">Alcance del prototipo</span>
+  <h2>Existe para responder una pregunta, no para parecerse al juego</h2>
+  <p><strong>Hipótesis.</strong> Si 40 personas que no se conocen comparten una ciudad chica con lotes propios, jornadas limitadas y una obra pública que necesita de todos, una mayoría vuelve al tercer día y una parte gasta jornadas en cosas que no son suyas. Dos partes medibles: volver, y actuar sobre lo colectivo.</p>
+  <div class="two" style="margin-top:18px">
+    <div>
+      <h3>Se construye</h3>
+      <ul class="lista">
+        <li>Una ciudad de 60 a 80 lotes, con un segundo barrio que se abre a mitad de la prueba.</li>
+        <li>Jornadas: 3 por día, acumulables hasta 6. Sin excepciones.</li>
+        <li>Tres materiales. Cuatro tipos de edificio con tres niveles, dibujados con rectángulos de color.</li>
+        <li>Una o dos obras públicas con barra de progreso y placa de contribuyentes.</li>
+        <li>Construcciones con hora real de finalización. Lote con nombre y color.</li>
+        <li>Decaimiento solo hasta "abandonado", con la acción de cuidar. Sin ruinas ni herencia.</li>
+        <li>Pantalla de "mientras no estabas". Regalo de materiales a un vecino con un botón: <strong>sin mercado ni precios</strong>.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Se falsea a mano <span class="tag">Mago de Oz</span></h3>
+      <ul class="lista fuera">
+        <li>El chat del barrio es un grupo de WhatsApp.</li>
+        <li>Las notificaciones de "terminó tu construcción" y "tenés un vecino nuevo" se mandan con un script simple o a mano.</li>
+        <li>El padrino de las primeras 48 horas es el equipo.</li>
+      </ul>
+      <h3 style="margin-top:18px">Queda afuera</h3>
+      <ul class="lista fuera">
+        <li>Múltiples ciudades, consolidación, ruinas, gobierno de barrio, cosméticos, monetización, arte y landing pública. Entrada solo por link de invitación.</li>
+      </ul>
+    </div>
+  </div>
+  <p style="margin-top:18px"><strong>El experimento.</strong> Una cohorte de 40 a 60 personas, tres semanas, invitación cerrada, un tercio conocidos y dos tercios desconocidos entre sí. Los umbrales se fijan antes de arrancar: más de la mitad de quienes completan la primera sesión vuelven al día 3; al menos un tercio de las jornadas totales va a cosas ajenas (obras, ayudar, cuidar, regalar); el grupo de WhatsApp tiene conversación no iniciada por el equipo. Si falla la primera, es el loop personal; si fallan la segunda o la tercera, es el corazón.</p>
+  <div class="regla"><p><strong>Tiempo:</strong> 4 a 6 semanas de construcción, 3 de prueba. Si la construcción pasa de 6, el alcance se abrió: volver a esta lista.</p></div>
+</section>
+
+<section class="two">
+  <div>
+    <span class="eyebrow">Preguntas abiertas para el prototipo</span>
+    <ul class="lista">
+      <li>Tamaño real de ciudad y ritmo de apertura de barrios: ¿150, 300? Se calibra con datos, no de antemano.</li>
+      <li>Duración de construcciones y tiempos de decaimiento: los números de este documento son puntos de partida.</li>
+      <li>Cuántos tipos de material y edificio alcanzan para que haya interdependencia sin planilla de Excel.</li>
+      <li>Gobierno de barrio: votación para demoler o rezonificar, y cuándo introducirla sin frenar el arranque.</li>
+      <li>Abuso con cuentas alternativas sobre ruinas y lotes: restringir ruinas a gente sin lote en la ciudad y cobrar restauración según lo construido.</li>
+      <li>Qué pasa exactamente el día que una ciudad se consolida: ceremonia, recompensas, cómo se elige la siguiente.</li>
+    </ul>
+  </div>
+  <div>
+    <span class="eyebrow">Fuera de alcance en v1 <span class="tag">después</span></span>
+    <ul class="lista fuera">
+      <li>Competencia formal entre barrios o ciudades. Emerge sola cuando hay masa crítica; recién entonces se formaliza.</li>
+      <li>Comercio entre ciudades y mapa mundial. Se deja el lugar, no se construye.</li>
+      <li>Monetización. Primero comunidad, después cosméticos.</li>
+      <li>Arte final. El prototipo se valida con geometría plana y color.</li>
+    </ul>
+    <p style="margin-top:22px;font-size:14px;color:var(--ink-2)"><strong>Lo que valida el prototipo:</strong> que un grupo chico de desconocidos vuelva un tercer día por la ciudad, no por el juego.</p>
+  </div>
+</section>
+
+<footer>Decisiones cerradas en sesión de diseño · 13 de septiembre de 2026</footer>
+</div>
+
+<script>
+(function(){
+  var c=document.getElementById('city'); if(!c) return;
+  var ctx=c.getContext('2d');
+  var css=getComputedStyle(document.documentElement);
+  function v(n){return css.getPropertyValue(n).trim();}
+  var h=new Date().getHours();
+  var night = h<7 || h>=20;
+  var dusk = (h>=18 && h<20) || (h>=6 && h<7);
+  var horaEl=document.getElementById('hora');
+  if(horaEl) horaEl.textContent = (night?'Noche':dusk?'Atardecer':'Día')+' · '+String(h).padStart(2,'0')+':00';
+
+  var W=c.width,H=c.height, T=24, cols=Math.floor(W/T), rows=Math.floor(H/T);
+  var ground = night? '#1A2230' : dusk? '#D8CBB4' : '#E4E0D6';
+  var road = night? '#243040' : dusk? '#B9AE99' : '#CFCAC0';
+  var pal = { res:v('--tile-active')||'#D9962E', green:v('--tile-green')||'#6FA88A', ind:v('--tile-ind')||'#7C8BA5', neglect:v('--tile-neglect')||'#B7A47C', aband:v('--tile-aband')||'#8C8C8C', ruin:v('--tile-ruin')||'#5E5A55', free:v('--tile-free')||'#D3D9E1' };
+  if(night){ pal.res='#B77A22'; pal.green='#3F6E58'; pal.ind='#4E5C75'; pal.neglect='#6B6048'; pal.free='#22293A'; }
+  // seeded random so it's stable per load
+  var seed=Math.floor(Math.random()*1e9); function rnd(){ seed=(seed*1664525+1013904223)%4294967296; return seed/4294967296; }
+  ctx.fillStyle=ground; ctx.fillRect(0,0,W,H);
+  // roads every 5 cols/rows with jitter
+  var vroads=[],hroads=[]; for(var x=3;x<cols;x+=4+Math.floor(rnd()*3)) vroads.push(x); for(var y=2;y<rows;y+=3+Math.floor(rnd()*3)) hroads.push(y);
+  ctx.fillStyle=road; vroads.forEach(function(x){ctx.fillRect(x*T,0,T*0.5,H);}); hroads.forEach(function(y){ctx.fillRect(0,y*T,W,T*0.5);});
+  // density falls off from center-left "plaza"
+  var cx=cols*0.42, cy=rows*0.5;
+  for(var y=0;y<rows;y++){ for(var x=0;x<cols;x++){
+    if(vroads.indexOf(x)>=0||hroads.indexOf(y)>=0) continue;
+    var d=Math.hypot((x-cx)/cols*2,(y-cy)/rows)*1.6;
+    var occ = rnd() > d*0.75;
+    if(!occ){ if(rnd()<0.25){ ctx.fillStyle=pal.free; ctx.fillRect(x*T+3,y*T+3,T-6,T-6);} continue; }
+    var r=rnd(), col, state='active';
+    if(Math.abs(x-cx)<2&&Math.abs(y-cy)<2) col=pal.green;
+    else if(r<0.62) col=pal.res; else if(r<0.78) col=pal.ind; else if(r<0.86) col=pal.green;
+    else if(r<0.93){col=pal.neglect;state='neglect';} else if(r<0.97){col=pal.aband;state='aband';} else {col=pal.ruin;state='ruin';}
+    var lvl = 1+Math.floor(rnd()*3*(1-d*0.4));
+    var inset = 4 - Math.min(lvl,3);
+    ctx.fillStyle=col; ctx.fillRect(x*T+inset,y*T+inset,T-inset*2,T-inset*2);
+    if(lvl>1){ ctx.fillStyle='rgba(0,0,0,'+(night?0.25:0.08)+')'; ctx.fillRect(x*T+inset,y*T+T-inset-3,T-inset*2,3); }
+    // windows
+    if(col!==pal.green && state==='active' && (night||dusk)){
+      ctx.fillStyle = night? 'rgba(255,214,140,.95)' : 'rgba(255,230,180,.55)';
+      var n=1+Math.floor(rnd()*3);
+      for(var i=0;i<n;i++){ if(rnd()<0.8) ctx.fillRect(x*T+6+i*5, y*T+7+Math.floor(rnd()*2)*6, 3,3); }
+    } else if(col!==pal.green && state==='active'){
+      ctx.fillStyle='rgba(255,255,255,.55)'; var m=1+Math.floor(rnd()*3); for(var j=0;j<m;j++) ctx.fillRect(x*T+6+j*5,y*T+8,3,3);
+    }
+    if(state==='neglect'&&night&&rnd()<0.3){ ctx.fillStyle='rgba(255,214,140,.35)'; ctx.fillRect(x*T+8,y*T+9,3,3); }
+  }}
+})();
+</script>

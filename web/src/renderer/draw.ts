@@ -82,6 +82,14 @@ export function drawScene(ctx: CanvasRenderingContext2D, layout: Layout, scene: 
     }
   }
 
+  // Estado del lote por encima del filtro: el pasto y la mano de "cuidar" tienen que verse también de noche.
+  for (const lot of scene.lots) {
+    if (lot.status !== 'ocupado') continue;
+    const { px, py } = at(lot);
+    if (lot.state === 'descuidado') drawGrass(ctx, px, py, t);
+    if (lot.state === 'abandonado') drawCare(ctx, px, py, t);
+  }
+
   // Construcciones en curso, por encima del filtro para que se vean también de noche.
   const building = new Map((scene.constructions ?? []).map((c) => [c.lot_id, Date.parse(c.ends_at)]));
   for (const lot of scene.lots) {
@@ -267,6 +275,62 @@ function drawWindows(ctx: CanvasRenderingContext2D, level: number, px: number, p
   for (let i = 0; i < level; i++) {
     ctx.fillRect(bx + (bs * (i + 1)) / (level + 1) - w / 2, by + bs * 0.2, w, w);
   }
+  ctx.restore();
+}
+
+// Lote descuidado: pasto crecido en la base (docs/07, "El canvas").
+function drawGrass(ctx: CanvasRenderingContext2D, px: number, py: number, t: number) {
+  const base = py + t * 0.88;
+  ctx.save();
+  ctx.strokeStyle = '#6f7d3a';
+  ctx.lineWidth = Math.max(1.2, t * 0.035);
+  ctx.lineCap = 'round';
+  [-0.26, -0.13, 0, 0.13, 0.26].forEach((d, i) => {
+    const x = px + t / 2 + d * t;
+    const h = t * (i % 2 ? 0.13 : 0.19);
+    const lean = (i % 2 ? 1 : -1) * t * 0.045;
+    ctx.beginPath();
+    ctx.moveTo(x, base);
+    ctx.quadraticCurveTo(x + lean * 0.5, base - h * 0.6, x + lean, base - h);
+    ctx.stroke();
+  });
+  ctx.restore();
+}
+
+// Lote abandonado: una mano en una chapita, para que el vecino vea que puede cuidarlo.
+// Los dedos van verticales y rectos: a este tamaño, redondeados se confunden con el glifo de la plaza.
+function drawCare(ctx: CanvasRenderingContext2D, px: number, py: number, t: number) {
+  const r = Math.max(9, t * 0.19);
+  const cx = px + t - r - t * 0.04;
+  const cy = py + r + t * 0.04;
+  ctx.save();
+  ctx.fillStyle = ACCENT;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = '#fff';
+  const w = r * 0.17; // ancho de cada dedo
+  const gap = r * 0.075;
+  const heights = [0.46, 0.58, 0.5, 0.34]; // índice, mayor, anular, meñique
+  const left = cx - (4 * w + 3 * gap) / 2 + r * 0.06; // corrido a la derecha: el pulgar ocupa la izquierda
+  heights.forEach((h, i) => {
+    const x = left + i * (w + gap);
+    roundRect(ctx, x, cy + r * 0.1 - r * h, w, r * h, w / 2);
+    ctx.fill();
+  });
+
+  // Pulgar: el mismo dedo, apoyado en diagonal sobre el costado de la palma.
+  ctx.save();
+  ctx.translate(left - gap, cy + r * 0.1);
+  ctx.rotate(-Math.PI / 2.6);
+  roundRect(ctx, -w, 0, w, r * 0.42, w / 2);
+  ctx.fill();
+  ctx.restore();
+
+  // Palma.
+  roundRect(ctx, left - w * 0.7, cy, 4 * w + 3 * gap + w * 1.2, r * 0.52, r * 0.16);
+  ctx.fill();
   ctx.restore();
 }
 

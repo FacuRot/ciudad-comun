@@ -1,9 +1,10 @@
-// Realtime sobre lots y constructions, con polling de respaldo (docs/06-acciones-y-api.md, "Lecturas"):
+// Realtime sobre lots, constructions, public_works y barrios, con polling de respaldo
+// (docs/06-acciones-y-api.md, "Lecturas"):
 // si el canal no llega a SUBSCRIBED en 5 s o se cae, se repite la carga inicial cada 30 s.
 import { sb } from './client';
 import { refreshCity, refreshMe } from './sync';
 import { useCity } from '../store/city';
-import type { Construction, Lot } from '../types/game';
+import type { Barrio, Construction, Lot, PublicWork } from '../types/game';
 
 const SUBSCRIBE_TIMEOUT_MS = 5_000;
 const POLL_MS = 30_000;
@@ -45,6 +46,13 @@ export function connectCity(): () => void {
     })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'constructions' }, (payload) => {
       if (payload.eventType !== 'DELETE') useCity.getState().applyConstruction(payload.new as Construction);
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'public_works' }, (payload) => {
+      if (payload.eventType !== 'DELETE') useCity.getState().applyWork(payload.new as PublicWork);
+    })
+    // Apertura del barrio: sus lotes llegan por el canal de lots; acá solo cambia el estado del barrio.
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'barrios' }, (payload) => {
+      if (payload.eventType !== 'DELETE') useCity.getState().applyBarrio(payload.new as Barrio);
     })
     .subscribe((status) => {
       if (closed) return;

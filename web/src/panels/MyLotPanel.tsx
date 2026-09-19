@@ -2,7 +2,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { build, recolorLot, renameLot } from '../api/actions';
 import { GameError, messageOf } from '../api/errors';
-import { loadHelps } from '../api/reads';
+import { loadHelps, loadVisits } from '../api/reads';
 import { useCity, type CitySnapshot } from '../store/city';
 import { LOT_COLORS } from '../renderer/colors';
 import {
@@ -13,6 +13,7 @@ import {
   formatNumber,
   formatPercent,
   formatRemaining,
+  plural,
 } from '../game/format';
 import { effectiveRate, producersOf, scarceMaterial } from '../game/production';
 import { configOf, type BuildingType, type CityConfig, type Construction, type Inventory, type Lot, type Material } from '../types/game';
@@ -45,6 +46,7 @@ export function MyLotPanel({ lot }: { lot: Lot }) {
           <p>Tu edificio ya está al máximo.</p>
         </section>
       )}
+      <Visits lotId={lot.id} names={names} />
     </aside>
   );
 }
@@ -344,6 +346,44 @@ function InProgress({ construction, names }: { construction: Construction; names
           {helpers.length
             ? `Ayudaron: ${helpers.map((id) => names.get(id) ?? 'alguien').join(', ')}`
             : 'Todavía no ayudó nadie.'}
+        </p>
+      )}
+    </section>
+  );
+}
+
+// "Quién pasó por acá": las visitas de la última semana (docs/07, panel Mi lote).
+const VISIT_DAYS = 7;
+
+function Visits({ lotId, names }: { lotId: string; names: Names }) {
+  const [visitors, setVisitors] = useState<string[] | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    loadVisits(lotId, VISIT_DAYS)
+      .then((rows) => {
+        if (cancelled) return;
+        const seen = new Set<string>();
+        for (const r of rows) if (r.actor_id) seen.add(r.actor_id);
+        setVisitors([...seen]);
+      })
+      .catch(() => !cancelled && setVisitors([]));
+    return () => {
+      cancelled = true;
+    };
+  }, [lotId]);
+
+  if (!visitors) return null;
+
+  return (
+    <section>
+      <h3>Quién pasó por acá</h3>
+      {visitors.length === 0 ? (
+        <p className="muted">Nadie pasó en los últimos {VISIT_DAYS} días.</p>
+      ) : (
+        <p>
+          {visitors.map((id) => names.get(id) ?? 'alguien').join(', ')}{' '}
+          <span className="muted">· {plural(visitors.length, 'vecino', 'vecinos')} en {VISIT_DAYS} días</span>
         </p>
       )}
     </section>

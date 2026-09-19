@@ -24,6 +24,8 @@ type CityState = {
   applyLot: (lot: Lot) => void;
   patchMyLot: (patch: Partial<Lot>) => void;
   applyConstruction: (construction: Construction) => void;
+  applyWork: (work: PublicWork) => void;
+  applyBarrio: (barrio: Barrio) => void;
 };
 
 export const useCity = create<CityState>((set) => ({
@@ -68,4 +70,14 @@ export const useCity = create<CityState>((set) => ({
         snapshot: { ...s.snapshot, constructions: construction.completed_at ? rest : [...rest, construction] },
       };
     }),
+  applyWork: (work) =>
+    set((s) =>
+      s.snapshot ? { snapshot: { ...s.snapshot, works: s.snapshot.works.map((w) => (w.id === work.id ? work : w)) } } : {},
+    ),
+  applyBarrio: (barrio) =>
+    set((s) =>
+      s.snapshot
+        ? { snapshot: { ...s.snapshot, barrios: s.snapshot.barrios.map((b) => (b.id === barrio.id ? barrio : b)) } }
+        : {},
+    ),
 }));

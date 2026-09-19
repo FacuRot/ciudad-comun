@@ -16,7 +16,7 @@ export async function loadCity(): Promise<CitySnapshot> {
     sb.from('barrios').select('*').order('ordinal'),
     sb.from('public_works').select('*'),
     sb.from('constructions').select('*').is('completed_at', null),
-    sb.from('players').select('id, display_name, last_seen_at'),
+    sb.from('players').select('id, display_name, last_seen_at, created_at'),
   ]);
   return {
     city: unwrap(city),
@@ -36,6 +36,34 @@ export async function loadHelps(constructionId: string): Promise<{ helper_id: st
       .select('helper_id, created_at')
       .eq('construction_id', constructionId)
       .order('created_at'),
+  );
+}
+
+// Placa de una obra: un renglón por aporte. El panel los agrupa por jugador.
+export async function loadContributions(
+  workId: string,
+): Promise<{ player_id: string; ladrillo: number; madera: number; energia: number }[]> {
+  return unwrap(
+    await sb
+      .from('public_work_contributions')
+      .select('player_id, ladrillo, madera, energia')
+      .eq('public_work_id', workId)
+      .order('created_at'),
+  );
+}
+
+// Quién pasó por un lote en los últimos días. lot_visits no es legible bajo RLS:
+// se leen los eventos lot.visited, que sí lo son dentro de la ciudad.
+export async function loadVisits(lotId: string, days: number): Promise<{ actor_id: string | null; created_at: string }[]> {
+  const since = new Date(Date.now() - days * 24 * 3600 * 1000).toISOString();
+  return unwrap(
+    await sb
+      .from('events')
+      .select('actor_id, created_at')
+      .eq('type', 'lot.visited')
+      .eq('lot_id', lotId)
+      .gte('created_at', since)
+      .order('created_at', { ascending: false }),
   );
 }
 

@@ -10,7 +10,7 @@ export type PublicWork = Tables['public_works']['Row'];
 export type Construction = Tables['constructions']['Row'];
 export type Player = Tables['players']['Row'];
 export type Inventory = Tables['inventories']['Row'];
-export type PlayerPublic = Pick<Player, 'id' | 'display_name' | 'last_seen_at'>;
+export type PlayerPublic = Pick<Player, 'id' | 'display_name' | 'last_seen_at' | 'created_at'>;
 
 export type BuildingType = Enums['building_t'];
 export type Material = Enums['material_t'];
@@ -51,6 +51,10 @@ export type CityConfig = {
     produces: Record<BuildingType, Material | null>;
     levels: Record<string, { cost: Record<Material, number>; hours: number }>;
   };
+  help: { hours_reduced: number; max_per_helper: number };
+  care: { days_added: number; max_per_absence: number; min_state: LotState };
+  decay: { descuidado_after_days: number; abandonado_after_days: number };
+  gift: { min_amount: number };
   lots: { max_claim_distance: number };
   palette: string[];
 };

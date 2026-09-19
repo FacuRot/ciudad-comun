@@ -100,6 +100,10 @@ const { data: inv } = await sb.from('inventories').select('*').eq('player_id', u
 // Placa de una obra
 sb.from('public_work_contributions').select('player_id, players(display_name)').eq('public_work_id', id);
 
+// Quién pasó por un lote: lot_visits no tiene política de lectura, así que el cliente
+// lee los eventos lot.visited, que sí son legibles dentro de la ciudad.
+sb.from('events').select('actor_id, created_at').eq('type', 'lot.visited').eq('lot_id', id);
+
 // Realtime
 sb.channel('city')
   .on('postgres_changes', { event: '*', schema: 'public', table: 'lots' }, applyLot)

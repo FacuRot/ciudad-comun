@@ -18,6 +18,7 @@ export type Scene = {
   timezone: string;
   myLotId?: string | null;
   selectedLotId?: string | null;
+  selectedWorkId?: string | null;
   marks?: Map<string, LotMark>; // pantalla de entrada: qué lotes libres se pueden tomar
   hovered?: Cell | null;
 };
@@ -107,6 +108,16 @@ export function drawScene(ctx: CanvasRenderingContext2D, layout: Layout, scene: 
     ctx.strokeStyle = id === scene.selectedLotId ? ACCENT : theme.ink;
     ctx.lineWidth = Math.max(2, t * 0.05);
     roundRect(ctx, px + t * 0.035, py + t * 0.035, t * 0.93, t * 0.93, t * 0.1);
+    ctx.stroke();
+  }
+
+  const selectedWork = scene.selectedWorkId ? scene.works.find((w) => w.id === scene.selectedWorkId) : null;
+  if (selectedWork) {
+    const { px, py } = at(selectedWork);
+    const out = t * 0.04;
+    ctx.strokeStyle = ACCENT;
+    ctx.lineWidth = Math.max(2, t * 0.05);
+    roundRect(ctx, px - out, py - out, t + out * 2, t + out * 2, t * 0.06);
     ctx.stroke();
   }
 

@@ -10,6 +10,14 @@ export const BUILDING_LABEL: Record<BuildingType, string> = {
   plaza: 'Plaza',
 };
 
+// Singular y plural en minúscula, para contar ("3 generadores").
+export const BUILDING_COUNT: Record<BuildingType, [string, string]> = {
+  ladrilleria: ['ladrillería', 'ladrillerías'],
+  aserradero: ['aserradero', 'aserraderos'],
+  generador: ['generador', 'generadores'],
+  plaza: ['plaza', 'plazas'],
+};
+
 // Glifo del edificio en el mapa y en el panel (docs/07, "El canvas").
 export const BUILDING_GLYPH: Record<BuildingType, string> = {
   ladrilleria: '■',
@@ -40,4 +48,19 @@ export function formatRemaining(ms: number): string {
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
   return m ? `${h} h ${m} min` : `${h} h`;
+}
+
+const dayFormat = new Intl.DateTimeFormat('es-AR', { day: 'numeric', month: 'long' });
+
+// "14 de septiembre": desde cuándo anda alguien por la ciudad.
+export function formatDay(iso: string): string {
+  return dayFormat.format(new Date(iso));
+}
+
+export function daysSince(iso: string): number {
+  return Math.floor((Date.now() - Date.parse(iso)) / 86_400_000);
+}
+
+export function plural(n: number, one: string, many: string): string {
+  return `${n} ${n === 1 ? one : many}`;
 }

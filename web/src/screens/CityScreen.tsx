@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { heartbeat } from '../api/actions';
+import { getSummary, heartbeat } from '../api/actions';
 import { connectCity } from '../api/live';
 import { refreshCity } from '../api/sync';
 import { messageOf } from '../api/errors';
@@ -10,9 +10,12 @@ import { MyLotPanel } from '../panels/MyLotPanel';
 import { OtherLotPanel } from '../panels/OtherLotPanel';
 import { WorkPanel } from '../panels/WorkPanel';
 import { BarrioPanel } from '../panels/BarrioPanel';
+import { SummaryModal, type Collected } from '../panels/SummaryModal';
+import { InviteModal } from '../panels/InviteModal';
+import { Toasts } from '../panels/Toasts';
 import { gridSize, workPercent, type Cell } from '../game/geo';
 import { MATERIAL_LABEL } from '../game/format';
-import { configOf, type Inventory, type Material } from '../types/game';
+import { configOf, type GameEvent, type Inventory, type Material } from '../types/game';
 import { Notice } from '../App';
 
 // Qué muestra el panel lateral. 'mine' es el estado de reposo.
@@ -39,6 +42,8 @@ function CityScreen() {
   const inventory = useCity((s) => s.inventory);
   const [error, setError] = useState<string | null>(null);
   const [selection, setSelection] = useState<Selection>({ kind: 'mine' });
+  const [summary, setSummary] = useState<{ events: GameEvent[]; collected: Collected } | null>(null);
+  const [inviting, setInviting] = useState(false);
   const backToMine = () => setSelection({ kind: 'mine' });
 
   // Carga inicial y después Realtime (o polling si Realtime no anda).
@@ -48,13 +53,21 @@ function CityScreen() {
   }, []);
 
   // Producción perezosa: el latido recoge lo producido al abrir y cada vez que la pestaña vuelve a verse.
+  // Si estuvo bastante rato afuera, además trae el resumen de lo que pasó.
   useEffect(() => {
-    const beat = () => {
-      if (document.visibilityState === 'visible') heartbeat().catch(() => {});
+    const beat = async () => {
+      if (document.visibilityState !== 'visible') return;
+      const pulse = await heartbeat();
+      if (!pulse.show_summary) return;
+      const events = await getSummary(pulse.since);
+      setSummary({ events, collected: pulse.collected });
     };
-    beat();
-    document.addEventListener('visibilitychange', beat);
-    return () => document.removeEventListener('visibilitychange', beat);
+    const run = () => {
+      beat().catch(() => {});
+    };
+    run();
+    document.addEventListener('visibilitychange', run);
+    return () => document.removeEventListener('visibilitychange', run);
   }, []);
 
   const view = useMemo(() => {
@@ -117,6 +130,9 @@ function CityScreen() {
       <header className="topbar">
         <Jornadas value={me.jornadas} cap={view.cap} />
         {inventory && <Materials inventory={inventory} />}
+        <button type="button" className="secondary invite" onClick={() => setInviting(true)}>
+          Invitar
+        </button>
       </header>
       <main className="map">
         <CityCanvas scene={view.scene} tooltip={view.tooltip} onCellClick={view.click} />
@@ -125,6 +141,11 @@ function CityScreen() {
         {view.footer} <span className="muted">· qué falta</span>
       </button>
       <Panel selection={selection} onBack={backToMine} onSelect={setSelection} myLotId={view.myLot?.id ?? null} />
+      <Toasts />
+      {summary && (
+        <SummaryModal events={summary.events} collected={summary.collected} onClose={() => setSummary(null)} />
+      )}
+      {inviting && <InviteModal onClose={() => setInviting(false)} />}
     </div>
   );
 }

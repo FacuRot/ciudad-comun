@@ -347,7 +347,8 @@ button.link .edit {
 }
 
 button.primary,
-button.secondary {
+button.secondary,
+a.as-button {
   margin-top: 0.9rem;
   padding: 0.65rem 0.9rem;
   border-radius: 0.5rem;
@@ -355,14 +356,16 @@ button.secondary {
   cursor: pointer;
 }
 
-button.primary {
+button.primary,
+a.primary.as-button {
   flex: 1;
   border: 0;
   background: var(--accent);
   color: #fff;
 }
 
-button.secondary {
+button.secondary,
+a.secondary.as-button {
   border: 1px solid var(--line);
   background: #fff;
   color: var(--ink);
@@ -474,4 +477,105 @@ button:disabled {
 
 .placa li.me {
   font-weight: 600;
+}
+
+/* Botón de invitar, a la derecha de la barra superior. */
+.invite {
+  margin-top: 0;
+  margin-left: auto;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.9rem;
+}
+
+/* Modales: resumen al volver e invitar. */
+.modal-back {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(30, 30, 28, 0.45);
+}
+
+.modal {
+  width: min(92vw, 26rem);
+  max-height: 85vh;
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 1.1rem 1.25rem;
+  border-radius: 0.75rem;
+  background: #fff;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+}
+
+.modal h2 {
+  margin: 0 0 0.6rem;
+  font-size: 1.25rem;
+}
+
+.modal p {
+  margin: 0.35rem 0;
+}
+
+.modal .row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.summary {
+  margin: 0.6rem 0 0;
+  padding-left: 1.1rem;
+}
+
+.summary li {
+  padding: 0.22rem 0;
+}
+
+button.link.more {
+  margin-top: 0.5rem;
+  color: var(--accent);
+  font-size: 0.9rem;
+}
+
+.invite-url {
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 0.7rem;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 0.45rem;
+  font-size: 0.9rem;
+}
+
+/* Un ancla que se ve como botón (WhatsApp abre en otra pestaña). */
+a.as-button {
+  box-sizing: border-box;
+  text-align: center;
+  text-decoration: none;
+}
+
+/* Avisos en vivo: se apilan abajo a la izquierda, fuera del panel. */
+.toasts {
+  position: fixed;
+  left: 1rem;
+  bottom: 1rem;
+  z-index: 15;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  max-width: min(80vw, 20rem);
+}
+
+.toast {
+  padding: 0.55rem 0.75rem;
+  border: 0;
+  border-radius: 0.5rem;
+  background: rgba(30, 30, 28, 0.92);
+  color: #fff;
+  font: inherit;
+  font-size: 0.9rem;
+  text-align: left;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
 }

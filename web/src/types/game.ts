@@ -11,6 +11,7 @@ export type Construction = Tables['constructions']['Row'];
 export type Player = Tables['players']['Row'];
 export type Inventory = Tables['inventories']['Row'];
 export type PlayerPublic = Pick<Player, 'id' | 'display_name' | 'last_seen_at' | 'created_at'>;
+export type GameEvent = Tables['events']['Row'];
 
 export type BuildingType = Enums['building_t'];
 export type Material = Enums['material_t'];

@@ -80,7 +80,7 @@ export function BarrioPanel({
             <span style={{ width: `${workPercent(work)}%` }} />
           </div>
           <p className="muted">
-            {work.status === 'completada' ? 'Terminada: el barrio produce más.' : `${workPercent(work)} % construida`}
+            {work.status === 'completada' ? 'Obra terminada: el barrio produce más.' : `${workPercent(work)} % construida`}
           </p>
           <div className="row">
             <button type="button" className="secondary" onClick={() => onOpenWork(work.id)}>

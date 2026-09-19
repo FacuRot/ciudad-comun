@@ -11,6 +11,11 @@ export type CitySnapshot = {
   players: PlayerPublic[];
 };
 
+// Aviso en vivo en una esquina (docs/07, "Avisos en vivo").
+export type Toast = { id: number; text: string };
+
+let toastSeq = 0;
+
 type CityState = {
   session: Session | null;
   authReady: boolean;
@@ -26,6 +31,9 @@ type CityState = {
   applyConstruction: (construction: Construction) => void;
   applyWork: (work: PublicWork) => void;
   applyBarrio: (barrio: Barrio) => void;
+  toasts: Toast[];
+  pushToast: (text: string) => void;
+  dismissToast: (id: number) => void;
 };
 
 export const useCity = create<CityState>((set) => ({
@@ -80,4 +88,8 @@ export const useCity = create<CityState>((set) => ({
         ? { snapshot: { ...s.snapshot, barrios: s.snapshot.barrios.map((b) => (b.id === barrio.id ? barrio : b)) } }
         : {},
     ),
+
+  toasts: [],
+  pushToast: (text) => set((s) => ({ toasts: [...s.toasts, { id: ++toastSeq, text }] })),
+  dismissToast: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
 }));

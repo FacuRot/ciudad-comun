@@ -116,6 +116,8 @@ sb.channel('city')
 
 Fallback: si el canal no llega a `SUBSCRIBED` en 5 segundos o se cae, `setInterval` de 30 segundos que repite la carga inicial.
 
+El toast de `events` solo puede filtrar por `target_player_id`, así que la obra completada y el barrio abierto —que no apuntan a nadie— se avisan mirando la fila que cambió en `public_works` y `barrios`, que ya llega por su propio canal.
+
 ## Wrappers tipados en el cliente
 
 Un archivo `web/src/api/actions.ts` con una función por RPC, que traduce el código de error a un mensaje y actualiza el store con la fila devuelta:

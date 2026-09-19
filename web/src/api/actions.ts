@@ -3,7 +3,7 @@ import { sb } from './client';
 import { codeOf, GameError } from './errors';
 import { refreshMe } from './sync';
 import { useCity } from '../store/city';
-import type { BuildingType, Construction, JoinMap, Lot, Material, PublicWork } from '../types/game';
+import type { BuildingType, Construction, GameEvent, JoinMap, Lot, Material, PublicWork } from '../types/game';
 
 export type InvitationInfo = {
   valid: boolean;
@@ -125,4 +125,18 @@ export async function gift(toPlayer: string, material: Material, amount: number)
 // Se llama al abrir el panel de un lote ajeno. No pasa nada si falla: es solo registro.
 export async function visitLot(lotId: string): Promise<void> {
   await sb.rpc('visit_lot', { p_lot_id: lotId });
+}
+
+// Eventos relevantes desde la última vez, para el modal "Mientras no estabas".
+export async function getSummary(since: string): Promise<GameEvent[]> {
+  const { data, error } = await sb.rpc('get_summary', { p_since: since });
+  if (error) throw new GameError(codeOf(error));
+  return (data as GameEvent[]) ?? [];
+}
+
+// Token nuevo para invitar. El cliente arma la URL /join/<token>.
+export async function createInvitation(): Promise<string> {
+  const { data, error } = await sb.rpc('create_invitation');
+  if (error) throw new GameError(codeOf(error));
+  return data as string;
 }

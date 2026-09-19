@@ -30,7 +30,7 @@ export function WorkPanel({ work, onBack }: { work: PublicWork; onBack: () => vo
         <p className="muted">
           {barrio?.name ?? 'La ciudad'} ·{' '}
           {done
-            ? `terminada: +${formatPercent(cfg.production.public_work_bonus)} de producción`
+            ? `obra terminada: +${formatPercent(cfg.production.public_work_bonus)} de producción`
             : `al terminarse, +${formatPercent(cfg.production.public_work_bonus)} de producción para todos los lotes del barrio`}
         </p>
       </section>

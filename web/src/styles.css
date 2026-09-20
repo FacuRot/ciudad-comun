@@ -255,18 +255,31 @@ button.link .edit {
   background: var(--accent);
 }
 
+/* En móvil el panel va abajo y la pantalla no se desplaza: el mapa es una
+   ventana fija con zoom y el panel desplaza su propio contenido. */
 @media (max-width: 767px) {
   .city {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto min(67vw, 60vh) auto auto;
+    grid-template-rows: auto min(67vw, 45vh) auto minmax(0, 1fr);
     grid-template-areas: 'top' 'map' 'foot' 'panel';
-    height: auto;
-    min-height: 100%;
+    height: 100%;
+    height: 100dvh;
   }
 
   .panel {
-    overflow: visible;
     border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+
+  .topbar {
+    font-size: 0.9rem;
+  }
+
+  /* El dedo es más grande que el mouse: campos y botones más altos. */
+  .give input,
+  .amount input,
+  .rename input {
+    padding: 0.6rem;
   }
 }
 
@@ -279,7 +292,23 @@ button.link .edit {
   display: block;
   width: 100%;
   height: 100%;
-  touch-action: manipulation;
+  /* El pellizco y el arrastre los maneja el canvas, no el navegador. */
+  touch-action: none;
+}
+
+/* Aparece solo con el mapa acercado, para volver a ver la ciudad entera. */
+.unzoom {
+  position: absolute;
+  right: 0.5rem;
+  bottom: 0.5rem;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
 }
 
 .tooltip {

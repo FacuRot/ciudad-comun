@@ -1,6 +1,6 @@
 # 07 · Pantallas y flujos
 
-El prototipo tiene **una pantalla principal** (la ciudad) con paneles laterales, más una pantalla de entrada y un panel de administración. Todo funciona en navegador de escritorio y móvil; en móvil los paneles ocupan la parte inferior.
+El prototipo tiene **una pantalla principal** (la ciudad) con paneles laterales, más una pantalla de entrada y un panel de administración. Todo funciona en navegador de escritorio y móvil; en móvil los paneles ocupan la parte inferior, la pantalla no se desplaza (el mapa es una ventana fija con zoom y el panel desplaza su propio contenido).
 
 ## Mapa de pantallas
 
@@ -60,6 +60,7 @@ Barra superior: jornadas (con puntos llenos/vacíos, 6 posiciones) e inventario.
 - Lotes libres: borde punteado tenue. Lotes de barrio cerrado: casi invisibles, con el nombre del barrio en gris y "se abre pronto".
 - Día/noche: el fondo del canvas cambia según la hora de la ciudad; de noche los lotes `activo` muestran 1 a 3 puntos amarillos (ventanas).
 - Hover/tap sobre un lote: tooltip con nombre del lote y apodo del dueño. Click: abre el panel correspondiente.
+- Acercar y alejar: pellizco en el celular, rueda del mouse en escritorio, hasta 4×. Con el mapa acercado, arrastrar lo corre y aparece un botón "Ver toda la ciudad". Nunca se puede alejar más que la ciudad entera, ni correrla más allá del borde. Un arrastre no abre paneles.
 - Redibujo total en cada cambio de estado. Sin optimización.
 
 ### Panel: Mi lote

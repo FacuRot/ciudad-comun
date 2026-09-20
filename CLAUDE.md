@@ -25,7 +25,7 @@ City builder de navegador donde todos los jugadores construyen la misma ciudad. 
 
 ## Stack
 
-Vite + React + TypeScript · Zustand · supabase-js · Canvas 2D · Supabase (Postgres, Auth magic link, Realtime, pg_cron) · Vercel/Netlify.
+Vite + React + TypeScript · Zustand · supabase-js · Canvas 2D · Supabase (Postgres, Auth email y contraseña, Realtime, pg_cron) · Vercel/Netlify.
 
 ## Comandos
 
@@ -38,7 +38,7 @@ cd web && npm run build
 psql "$DATABASE_URL" -f tests/rpc.sql    # pruebas de funciones
 ```
 
-Proyecto en la nube: `ciudad-comun` (ref `ublcrfhnysqpegzmywwi`, sa-east-1). Sin CLI global ni psql: `npx supabase ...`. Los tests corren con `npx supabase db query --linked -f tests/rpc.sql` (o por el MCP de Supabase); asumen el seed sin jugadores y terminan en rollback, así que sirven antes de registrar gente o contra una base local recién reseteada. En local (Docker), el magic link llega a Mailpit: http://127.0.0.1:54324.
+Proyecto en la nube: `ciudad-comun` (ref `ublcrfhnysqpegzmywwi`, sa-east-1). Sin CLI global ni psql: `npx supabase ...`. Los tests corren con `npx supabase db query --linked -f tests/rpc.sql` (o por el MCP de Supabase); asumen el seed sin jugadores y terminan en rollback, así que sirven antes de registrar gente o contra una base local recién reseteada. En local (Docker), el mail para recuperar la contraseña llega a Mailpit: http://127.0.0.1:54324.
 
 ## Convenciones
 

@@ -1,8 +1,8 @@
 // /join/:token (docs/07-pantallas-y-flujos.md §1).
-// A: sin sesión → mapa de fondo + email. B: con sesión y sin lote → elegir lote y fundar. C: con lote → /city.
+// A: sin sesión → mapa de fondo + registro. B: con sesión y sin lote → elegir lote y fundar. C: con lote → /city.
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { claimLot, invitationInfo, invitationMap, type InvitationInfo } from '../api/actions';
-import { sendMagicLink } from '../api/auth';
+import { entrar, registrar } from '../api/auth';
 import { GameError, messageOf } from '../api/errors';
 import { loadMe } from '../api/reads';
 import { useCity } from '../store/city';
@@ -99,7 +99,7 @@ export function JoinScreen({ token }: { token: string }) {
       <div className="map">
         {view && <CityCanvas scene={view.scene} tooltip={tooltip} onCellClick={choosing ? pick : undefined} />}
       </div>
-      {!session && <EmailCard inviter={info.inviter} token={token} />}
+      {!session && <CuentaCard inviter={info.inviter} />}
       {choosing && !selected && (
         <div className="card">
           <p>
@@ -126,15 +126,34 @@ export function JoinScreen({ token }: { token: string }) {
   );
 }
 
-function EmailCard({ inviter, token }: { inviter: string | null; token: string }) {
+const MIN_CLAVE = 8;
+
+// Estado A. La misma tarjeta sirve para crear la cuenta o para entrar con una que ya existe
+// (quien se registró y se fue antes de fundar vuelve por este mismo link). Sin navegar:
+// al haber sesión, JoinScreen pasa solo al estado B.
+function CuentaCard({ inviter }: { inviter: string | null }) {
+  const [nueva, setNueva] = useState(true);
   const [email, setEmail] = useState('');
-  const [state, setState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
+  const [password, setPassword] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setState('sending');
-    const ok = await sendMagicLink(email.trim(), `${window.location.origin}/join/${encodeURIComponent(token)}`);
-    setState(ok ? 'sent' : 'error');
+    setBusy(true);
+    setError(null);
+    try {
+      if (nueva) await registrar(email.trim(), password);
+      else await entrar(email.trim(), password);
+    } catch (err) {
+      setError(messageOf(err));
+      setBusy(false);
+    }
+  };
+
+  const cambiarModo = () => {
+    setNueva(!nueva);
+    setError(null);
   };
 
   return (
@@ -148,27 +167,36 @@ function EmailCard({ inviter, token }: { inviter: string | null; token: string }
           'Te invitaron a Ciudad Común'
         )}
       </h1>
-      {state === 'sent' ? (
-        <p>Revisá tu email. Te mandamos un link para entrar.</p>
-      ) : (
-        <>
-          <label htmlFor="email">Tu email</label>
-          <input
-            id="email"
-            type="email"
-            required
-            autoComplete="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-          <div className="row">
-            <button className="primary" disabled={state === 'sending'}>
-              Entrar
-            </button>
-          </div>
-          {state === 'error' && <p className="error">No pudimos mandar el email. Probá de nuevo en un rato.</p>}
-        </>
-      )}
+      <label htmlFor="email">Tu email</label>
+      <input
+        id="email"
+        type="email"
+        required
+        autoComplete="email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+      />
+      <label htmlFor="clave">{nueva ? `Elegí una contraseña (mínimo ${MIN_CLAVE} caracteres)` : 'Tu contraseña'}</label>
+      <input
+        id="clave"
+        type="password"
+        required
+        minLength={nueva ? MIN_CLAVE : undefined}
+        autoComplete={nueva ? 'new-password' : 'current-password'}
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+      />
+      {error && <p className="error">{error}</p>}
+      <div className="row">
+        <button className="primary" disabled={busy || (nueva && password.length < MIN_CLAVE)}>
+          {nueva ? 'Crear cuenta y elegir lote' : 'Entrar'}
+        </button>
+      </div>
+      <p>
+        <button type="button" className="link" onClick={cambiarModo}>
+          {nueva ? 'Ya tengo cuenta' : 'Quiero crear una cuenta'}
+        </button>
+      </p>
     </form>
   );
 }

@@ -7,7 +7,7 @@ Estimación base: 10 a 12 horas por semana. Con Claude Code haciendo el grueso d
 ## Semana 0 · Antes de empezar (una tarde)
 
 - Crear el repo con la estructura de `03-arquitectura-y-stack.md`. Copiar `CLAUDE.md` a la raíz y esta carpeta `docs/`.
-- Crear el proyecto en Supabase. Activar `pg_cron`. Configurar el magic link (plantilla en español, URL de redirección a `/join`).
+- Crear el proyecto en Supabase. Activar `pg_cron`. Configurar Auth: email y contraseña, confirmación de email apagada, URL de redirección a `/clave`.
 - Crear el proyecto en Vercel o Netlify apuntando a `web/`.
 - Crear el grupo de WhatsApp de la cohorte (vacío por ahora).
 
@@ -16,7 +16,7 @@ Estimación base: 10 a 12 horas por semana. Con Claude Code haciendo el grueso d
 ## Semana 1 · Base de datos y mapa que se ve
 
 - Partir `schema.sql` en migraciones. Correr el seed. Generar tipos.
-- Auth por magic link en el cliente. Pantalla `/join/:token` estados A y B (sin claim todavía).
+- Registro y entrada con contraseña en el cliente. Pantalla `/join/:token` estados A y B (sin claim todavía).
 - Renderer del canvas: grilla, calles, lotes libres, obras como celdas especiales, día/noche por hora. Carga inicial de `lots`, `barrios`, `public_works`.
 - `claim_lot` funcionando de punta a punta, con la validación de distancia.
 

@@ -2,7 +2,7 @@
 // Nunca se muestra el texto crudo de Postgres.
 
 const MESSAGES: Record<string, string> = {
-  NO_AUTH: 'Entrá con tu email para seguir.',
+  NO_AUTH: 'Entrá con tu email y contraseña para seguir.',
   NO_PLAYER: 'Todavía no tenés lote. Entrá con el link de tu invitación.',
   ALREADY_PLAYER: 'Ya tenés un lote en la ciudad.',
   BAD_INVITE: 'Esta invitación ya no sirve. Pedile otra a quien te invitó.',
@@ -26,6 +26,15 @@ const MESSAGES: Record<string, string> = {
   GIFT_TOO_SMALL: 'El regalo mínimo es de 5 unidades.',
   BAD_AMOUNT: 'Las cantidades no pueden ser negativas.',
   NOT_ADMIN: 'Esto es solo para el equipo.',
+  // De la entrada con contraseña (ver authCodeOf).
+  BAD_CREDENTIALS: 'Email o contraseña incorrectos.',
+  EMAIL_TAKEN: 'Ese email ya tiene cuenta. Entrá con tu contraseña.',
+  WEAK_PASSWORD: 'La contraseña necesita al menos 8 caracteres.',
+  BAD_EMAIL: 'Revisá el email: parece que tiene un error.',
+  TOO_MANY: 'Probaste muchas veces. Esperá un minuto.',
+  SAME_PASSWORD: 'Elegí una contraseña distinta a la anterior.',
+  BAD_RECOVERY: 'Este link de contraseña ya venció. Pedí uno nuevo.',
+  CONFIRM_EMAIL: 'Te mandamos un email para confirmar la cuenta. Abrilo y volvé a este link.',
   // Derivados de restricciones de la base (ver codeOf).
   ALREADY_HELPED: 'Ya ayudaste en esta obra.',
   LOT_NAME_TAKEN: 'Ese nombre ya lo usa otro lote.',
@@ -53,6 +62,32 @@ export class GameError extends Error {
 }
 
 type PgError = { message?: string; code?: string };
+
+// Los errores de supabase-auth no pasan por PostgREST: traen su propio código.
+const AUTH_ERRORS: Record<string, string> = {
+  invalid_credentials: 'BAD_CREDENTIALS',
+  user_already_exists: 'EMAIL_TAKEN',
+  email_exists: 'EMAIL_TAKEN',
+  weak_password: 'WEAK_PASSWORD',
+  validation_failed: 'BAD_EMAIL',
+  email_address_invalid: 'BAD_EMAIL',
+  over_request_rate_limit: 'TOO_MANY',
+  over_email_send_rate_limit: 'TOO_MANY',
+  same_password: 'SAME_PASSWORD',
+  session_not_found: 'BAD_RECOVERY',
+  session_expired: 'BAD_RECOVERY',
+};
+
+export function authCodeOf(error: { code?: string; message?: string; status?: number }): string {
+  if (error.code && error.code in AUTH_ERRORS) return AUTH_ERRORS[error.code];
+  const message = error.message ?? '';
+  if (/failed to fetch|networkerror|network request failed/i.test(message)) return 'OFFLINE';
+  // Versiones viejas de supabase-js no mandan `code`: queda el status.
+  if (error.status === 400 || error.status === 401) return 'BAD_CREDENTIALS';
+  if (error.status === 422) return 'EMAIL_TAKEN';
+  if (error.status === 429) return 'TOO_MANY';
+  return 'UNKNOWN';
+}
 
 // La sesión venció o el token no sirve: PostgREST responde 401 con estos códigos.
 const AUTH_CODES = ['PGRST301', 'PGRST302', 'PGRST303'];

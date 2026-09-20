@@ -21,7 +21,7 @@ Dos partes medibles: volver, y actuar sobre lo colectivo. Si vuelven pero solo m
 - **Regalo de materiales** a cualquier vecino de la ciudad con un botón. **Sin mercado ni precios.**
 - **Pantalla "mientras no estabas"** al volver.
 - **Registro de visitas** a lotes ajenos ("3 vecinos pasaron por tu lote").
-- **Entrada por link de invitación** y login por magic link de email.
+- **Entrada por link de invitación**: quien la recibe se registra con email y contraseña, y vuelve con esas credenciales por `/entrar`.
 - **Panel de administración mínimo** para el equipo: ver estado de la ciudad, enviar avisos, forzar apertura del Barrio 2.
 
 ## Se falsea a mano (Mago de Oz)

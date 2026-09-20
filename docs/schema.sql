@@ -831,5 +831,5 @@ begin
   insert into invitations(city_id) select cid from generate_series(1, 5);
 end $$;
 
--- Después del seed: registrar al admin por magic link, usar una invitación con claim_lot,
+-- Después del seed: registrar al admin desde /join/<token> con email y contraseña, fundar su lote,
 -- y luego:  update players set is_admin = true where display_name = '<apodo>';

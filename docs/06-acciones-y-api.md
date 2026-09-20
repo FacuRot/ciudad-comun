@@ -13,7 +13,7 @@ Toda acción del jugador es una llamada `supabase.rpc('<función>', {...})`. Las
 
 | Código | Significado | Mensaje sugerido |
 |--------|-------------|------------------|
-| `NO_AUTH` | Sin sesión | "Entrá con tu email para seguir." |
+| `NO_AUTH` | Sin sesión | "Entrá con tu email y contraseña para seguir." |
 | `NO_PLAYER` | Usuario autenticado sin jugador | Redirigir a la pantalla de entrada. |
 | `ALREADY_PLAYER` | Ya tiene lote | Redirigir a la ciudad. |
 | `BAD_INVITE` | Token inválido, usado o vencido | "Esta invitación ya no sirve. Pedile otra a quien te invitó." |
@@ -38,10 +38,27 @@ Toda acción del jugador es una llamada `supabase.rpc('<función>', {...})`. Las
 
 El cliente (`web/src/api/errors.ts`) agrega tres códigos que ninguna función lanza: `OFFLINE` ("Se cortó la conexión. Probá de nuevo cuando vuelva.") cuando el pedido no llega, `UNKNOWN` para cualquier otra cosa, y los nombres de restricción de la base (`ALREADY_HELPED`, `LOT_NAME_TAKEN`, `DISPLAY_NAME_TAKEN`, `NAME_LENGTH`). Un 401 de PostgREST (`PGRST301` y compañía) se traduce a `NO_AUTH`: la sesión venció.
 
+### Errores de entrada (registro, login y contraseña)
+
+No pasan por PostgREST: son los de supabase-auth, y `authCodeOf` traduce su `code` a los nuestros.
+
+| Código supabase | Nuestro código | Mensaje |
+|---|---|---|
+| `invalid_credentials` | `BAD_CREDENTIALS` | "Email o contraseña incorrectos." |
+| `user_already_exists`, `email_exists` | `EMAIL_TAKEN` | "Ese email ya tiene cuenta. Entrá con tu contraseña." |
+| `weak_password` | `WEAK_PASSWORD` | "La contraseña necesita al menos 8 caracteres." |
+| `validation_failed`, `email_address_invalid` | `BAD_EMAIL` | "Revisá el email: parece que tiene un error." |
+| `over_request_rate_limit`, `over_email_send_rate_limit` | `TOO_MANY` | "Probaste muchas veces. Esperá un minuto." |
+| `same_password` | `SAME_PASSWORD` | "Elegí una contraseña distinta a la anterior." |
+| `session_not_found`, `session_expired`, o `/clave` sin sesión | `BAD_RECOVERY` | "Este link de contraseña ya venció. Pedí uno nuevo." |
+| (signUp sin sesión: el proyecto tiene las confirmaciones encendidas) | `CONFIRM_EMAIL` | "Te mandamos un email para confirmar la cuenta. Abrilo y volvé a este link." |
+
+Las cuatro funciones que los lanzan viven en `web/src/api/auth.ts`: `registrar`, `entrar`, `pedirClaveNueva` y `cambiarClave`. Ninguna toca la base del juego: el usuario queda en `auth.users` y recién `claim_lot` lo convierte en jugador.
+
 ## Acciones
 
 ### `invitation_info(p_token)` → jsonb
-Disponible para `anon`. Devuelve `{valid, city_id, inviter, lot_hint}`. Se usa en la pantalla de entrada antes del login.
+Disponible para `anon`. Devuelve `{valid, city_id, inviter, lot_hint}`. Se usa en la pantalla de entrada antes de que la persona se registre.
 
 ### `invitation_map(p_token)` → jsonb
 Disponible para `anon`. Solo lectura. Si el token es válido (existe, sin usar y sin vencer) devuelve el mapa de su ciudad: `{timezone, palette, max_claim_distance, lots, barrios, works}`; si no, `null`. Los lotes vienen sin dueño ni apodo (posición, estado, nombre, color, tipo y nivel). Es lo que pinta la pantalla de entrada en los estados A y B, cuando la persona todavía no es jugador y el RLS no le deja leer las tablas. Se eligió una función por token en lugar de políticas de lectura para `anon`: el mapa solo lo ve quien tiene un link vigente.

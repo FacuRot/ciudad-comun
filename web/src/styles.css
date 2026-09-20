@@ -323,6 +323,20 @@ button.link .edit {
 }
 
 /* Entrada */
+/* Entrar y contraseña nueva: la misma tarjeta, pero centrada y sin mapa detrás. */
+.entrada {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  padding: 1.5rem;
+  box-sizing: border-box;
+}
+
+.entrada .card {
+  position: static;
+  transform: none;
+}
+
 .join {
   position: relative;
   height: 100%;
@@ -373,6 +387,11 @@ button.link .edit {
 .card .row {
   display: flex;
   gap: 0.5rem;
+}
+
+/* Cambia el modo de la tarjeta: "Ya tengo cuenta", "Olvidé mi contraseña". */
+.card button.link {
+  text-decoration: underline;
 }
 
 button.primary,

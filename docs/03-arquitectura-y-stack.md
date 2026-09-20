@@ -9,10 +9,10 @@ Criterio rector: **lo más aburrido posible**. Cada pieza elegida es algo que no
 | Frontend | **Vite + React + TypeScript** | Rápido de levantar, ecosistema conocido, TypeScript comparte tipos con el contrato de la API. |
 | Mapa | **Canvas 2D nativo** (sin motor) | El mapa son ~100 rectángulos de color. Un motor (Pixi, Phaser) agrega peso y conceptos sin beneficio a esta escala. Se abstrae en un módulo `renderer/` para reemplazarlo después si hace falta. |
 | Estado cliente | **Zustand** | Un store chico: ciudad, mi jugador, panel abierto. Nada de Redux. |
-| Backend | **Supabase** (Postgres + Auth + Realtime + pg_cron) | Resuelve auth por magic link, tiempo real por cambios en tablas, y jobs programados sin escribir un servidor. Postgres es la única fuente de verdad. |
+| Backend | **Supabase** (Postgres + Auth + Realtime + pg_cron) | Resuelve auth por email y contraseña, tiempo real por cambios en tablas, y jobs programados sin escribir un servidor. Postgres es la única fuente de verdad. |
 | Lógica de juego | **Funciones SQL/plpgsql** expuestas como RPC | El cliente nunca escribe tablas: llama funciones que validan y aplican. Anti-trampa gratis, y las reglas viven en un solo lugar. |
 | Jobs | **pg_cron** dentro de Supabase | Recarga de jornadas, cierre de construcciones, evaluación de decaimiento, apertura del Barrio 2. |
-| Email | **Resend** (o el SMTP de Supabase Auth para el magic link) | Solo para magic link y, si da el tiempo, avisos de "terminó tu construcción". |
+| Email | **Resend** (o el SMTP de Supabase Auth) | Solo para recuperar la contraseña y, si da el tiempo, avisos de "terminó tu construcción". El SMTP integrado limita a ~2 mails por hora para todo el proyecto: si el reseteo lo va a usar más de una persona por vez, hace falta Resend. |
 | Hosting frontend | **Vercel** o **Netlify** (estático) | Deploy por push. |
 | Analítica | **Tabla `events` en Postgres** + consultas SQL | Las métricas del experimento salen de ahí. PostHog es opcional y se agrega solo si sobra tiempo. |
 | Zona horaria del juego | `America/Argentina/Buenos_Aires` | Las jornadas se recargan a las 00:00 de esta zona. Se guarda en `cities.timezone` para no hardcodear. |
@@ -32,7 +32,7 @@ Todo es gratis o entra en el tier gratuito de cada servicio para 60 usuarios.
        ▼           │
 ┌──────────────────┴──────────┐
 │  Supabase                   │
-│  Auth (magic link)          │
+│  Auth (email + contraseña)  │
 │  Postgres                   │
 │   - tablas (estado)         │
 │   - funciones RPC (reglas)  │
@@ -91,7 +91,8 @@ ciudad-comun/
 
 ## Seguridad mínima suficiente
 
-- Auth por magic link; sin contraseñas.
+- Auth por email y contraseña, sin confirmación de email: quien recibe una invitación se registra y entra en el momento. El correo solo se usa para recuperar la contraseña.
+- Cualquiera puede crear una cuenta, pero sin una invitación redimida queda inerte: no hay fila en `players`, y `my_city_id()` es `null`, así que RLS le filtra todo.
 - RLS activo en todas las tablas: lectura para autenticados dentro de su ciudad; escritura cerrada.
 - Las funciones RPC validan siempre `auth.uid()`; nunca reciben `player_id` por parámetro.
 - Los tokens de invitación son de un solo uso y expiran en 7 días.

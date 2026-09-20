@@ -4,6 +4,7 @@ import { connectCity } from '../api/live';
 import { refreshCity } from '../api/sync';
 import { messageOf } from '../api/errors';
 import { useCity } from '../store/city';
+import { navigate } from '../router';
 import { CityCanvas } from '../renderer/CityCanvas';
 import type { Scene } from '../renderer/draw';
 import { MyLotPanel } from '../panels/MyLotPanel';
@@ -30,8 +31,10 @@ export function CityGate() {
   const session = useCity((s) => s.session);
   const me = useCity((s) => s.me);
   const meReady = useCity((s) => s.meReady);
-  if (!session) return <Notice>Para entrar a Ciudad Común necesitás el link de una invitación.</Notice>;
-  if (!meReady) return <Notice>Cargando…</Notice>;
+  useEffect(() => {
+    if (!session) navigate('/entrar', true);
+  }, [session]);
+  if (!session || !meReady) return <Notice>Cargando…</Notice>;
   if (!me) return <Notice>Todavía no tenés lote. Abrí el link de tu invitación para fundar el tuyo.</Notice>;
   return <CityScreen />;
 }

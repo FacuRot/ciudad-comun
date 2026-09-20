@@ -1,23 +1,27 @@
 # 07 · Pantallas y flujos
 
-El prototipo tiene **una pantalla principal** (la ciudad) con paneles laterales, más una pantalla de entrada y un panel de administración. Todo funciona en navegador de escritorio y móvil; en móvil los paneles ocupan la parte inferior, la pantalla no se desplaza (el mapa es una ventana fija con zoom y el panel desplaza su propio contenido).
+El prototipo tiene **una pantalla principal** (la ciudad) con paneles laterales, más las pantallas de entrada y un panel de administración. Todo funciona en navegador de escritorio y móvil; en móvil los paneles ocupan la parte inferior, la pantalla no se desplaza (el mapa es una ventana fija con zoom y el panel desplaza su propio contenido).
 
 ## Mapa de pantallas
 
 ```
-/join/:token  ──login──▶  /join/:token (elegir lote)  ──claim──▶  /city
-                                                                   ├── panel: Mi lote
-                                                                   ├── panel: Lote ajeno
-                                                                   ├── panel: Obra pública
-                                                                   ├── panel: Barrio (qué falta)
-                                                                   ├── modal: Mientras no estabas
-                                                                   └── modal: Invitar
+/join/:token  ──registro──▶  /join/:token (elegir lote)  ──claim──▶  /city
+/entrar  ──login──────────────────────────────────────────────────▶  /city
+                                                                      ├── panel: Mi lote
+                                                                      ├── panel: Lote ajeno
+                                                                      ├── panel: Obra pública
+                                                                      ├── panel: Barrio (qué falta)
+                                                                      ├── modal: Mientras no estabas
+                                                                      └── modal: Invitar
+/clave  (contraseña nueva; adonde cae el mail de recuperación)
 /admin  (solo is_admin)
 ```
 
 ## 1. Entrada · `/join/:token`
 
-**Estado A — sin sesión.** Muestra el mapa de la ciudad de fondo (solo lectura, con los colores reales) y encima una tarjeta: "*Nombre del invitador* te invitó a *Ciudad Común*". Un campo de email y un botón "Entrar". Al enviar, Supabase manda el magic link; la tarjeta dice "Revisá tu email".
+**Estado A — sin sesión.** Muestra el mapa de la ciudad de fondo (solo lectura, con los colores reales) y encima una tarjeta: "*Nombre del invitador* te invitó a *Ciudad Común*". Email, contraseña (mínimo 8) y el botón "Crear cuenta y elegir lote". No hay confirmación por email: al registrarse, la misma pantalla pasa al estado B sin recargar.
+
+Debajo, "Ya tengo cuenta" cambia la tarjeta a entrar con la contraseña, sin salir del link. Es para quien se registró y se fue antes de fundar, o para quien ya juega y recibió otra invitación (en ese caso el estado C lo manda a la ciudad).
 
 Si el token no es válido: "Esta invitación ya no sirve. Pedile otra a quien te invitó." Sin formulario.
 
@@ -115,7 +119,15 @@ Genera el token, muestra la URL y un botón de copiar y otro de compartir por Wh
 
 Un toast discreto en la esquina cuando llega un evento dirigido al jugador por Realtime (ayuda recibida, regalo, obra completada, barrio abierto). Se apila, desaparece a los 6 segundos.
 
-## 3. Administración · `/admin`
+## 3. Entrar · `/entrar` y `/clave`
+
+`/entrar` es la puerta de vuelta: una tarjeta centrada con email, contraseña y "Entrar". No se registra nadie acá; la cuenta se crea desde el link de invitación. Abajo hay dos cosas: "Olvidé mi contraseña", que cambia la tarjeta a pedir el mail de recuperación ("Revisá tu email"), y una línea para quien todavía no tiene lote ("Abrí el link que te pasaron").
+
+`/city` y `/admin` sin sesión redirigen acá.
+
+`/clave` es adonde vuelve el link de recuperación: pide la contraseña nueva y entra a la ciudad. Si el link venció o ya se usó, no hay sesión y la tarjeta ofrece pedir otro.
+
+## 4. Administración · `/admin`
 
 Solo `is_admin`. Una página sin diseño:
 
@@ -128,8 +140,8 @@ Solo `is_admin`. Una página sin diseño:
 
 Este es el recorrido que el diseño intenta producir. Sirve para probar a mano antes de invitar a nadie.
 
-1. Recibo por WhatsApp un link de alguien que conozco. Lo abro en el celular. Veo un mapa con colores y una tarjeta con el nombre de quien me invitó. Pongo mi email.
-2. Abro el email, toco el link, vuelvo al mapa. Ahora hay lotes con borde punteado y uno o dos que pulsan al lado del lote de mi amigo. Toco uno.
+1. Recibo por WhatsApp un link de alguien que conozco. Lo abro en el celular. Veo un mapa con colores y una tarjeta con el nombre de quien me invitó. Pongo mi email y elijo una contraseña.
+2. Sin salir de la pantalla, el mapa se vuelve interactivo: hay lotes con borde punteado y uno o dos que pulsan al lado del lote de mi amigo. Toco uno.
 3. Pongo un apodo, un nombre para el lote, elijo un color. "Fundar acá". El lote aparece con mi color. Tengo 3 jornadas y un kit de materiales.
 4. Se abre el panel de mi lote. Dice que en el barrio escasea energía. Elijo generador. "Construir (1 jornada, 2 h)". El lote tiene borde animado. Me quedan 2 jornadas.
 5. El pie del mapa dice "Escuela 62 %". La toco. Veo la barra, la placa con nombres, un formulario prellenado con mis 10 de energía. "Aportar (1 jornada)". La barra sube un poco y mi apodo aparece en la lista. Me queda 1 jornada.

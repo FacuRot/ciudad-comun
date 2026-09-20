@@ -26,8 +26,10 @@ export function AdminGate() {
   const session = useCity((s) => s.session);
   const me = useCity((s) => s.me);
   const meReady = useCity((s) => s.meReady);
-  if (!session) return <Notice>Entrá con tu email para ver el panel.</Notice>;
-  if (!meReady) return <Notice>Cargando…</Notice>;
+  useEffect(() => {
+    if (!session) navigate('/entrar', true);
+  }, [session]);
+  if (!session || !meReady) return <Notice>Cargando…</Notice>;
   if (!me?.is_admin) return <Notice>{new GameError('NOT_ADMIN').message}</Notice>;
   return <AdminScreen />;
 }

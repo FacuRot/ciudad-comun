@@ -8,5 +8,5 @@ if (!url || !key) {
   throw new Error('Faltan VITE_SUPABASE_URL y VITE_SUPABASE_PUBLISHABLE_KEY en web/.env.local');
 }
 
-// Flujo implícito: el magic link funciona aunque el email se abra en otro navegador del celular.
+// Flujo implícito: el link para recuperar la contraseña funciona aunque el email se abra en otro navegador.
 export const sb = createClient<Database>(url, key, { auth: { flowType: 'implicit' } });

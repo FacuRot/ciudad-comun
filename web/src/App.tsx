@@ -5,7 +5,11 @@ import { useCity } from './store/city';
 import { navigate, usePath } from './router';
 import { AdminGate } from './screens/AdminScreen';
 import { CityGate } from './screens/CityScreen';
+import { ClaveScreen } from './screens/ClaveScreen';
+import { EntrarScreen } from './screens/EntrarScreen';
 import { JoinScreen } from './screens/JoinScreen';
+
+const ROUTES = ['/city', '/entrar', '/clave', '/admin'];
 
 export function App() {
   const path = usePath();
@@ -14,11 +18,13 @@ export function App() {
 
   const join = path.match(/^\/join\/([^/]+)/);
   useEffect(() => {
-    if (!join && path !== '/city' && path !== '/admin') navigate('/city', true);
+    if (!join && !ROUTES.includes(path)) navigate('/city', true);
   }, [path, join]);
 
   if (!authReady) return <Notice>Cargando…</Notice>;
   if (join) return <JoinScreen token={decodeURIComponent(join[1])} />;
+  if (path === '/entrar') return <EntrarScreen />;
+  if (path === '/clave') return <ClaveScreen />;
   if (path === '/admin') return <AdminGate />;
   return <CityGate />;
 }

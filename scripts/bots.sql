@@ -155,6 +155,13 @@ begin
     raise exception 'Hay % jugadores que no son bots: no corras esto sobre la base de la cohorte.', n_real;
   end if;
 
+  -- Repetir la corrida sobre bots viejos mezclaría dos simulaciones.
+  if exists (select 1 from players) then
+    raise exception 'Ya hay jugadores: corré scripts/bots_cleanup.sql antes de repetir la simulación.';
+  end if;
+  delete from bot_errors;
+  delete from bot_quiet;
+
   select id, config into cid, cfg from cities order by opened_at limit 1;
   if cid is null then raise exception 'No hay ciudad: corré el seed primero.'; end if;
   palette := cfg -> 'palette';

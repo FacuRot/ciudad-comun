@@ -38,3 +38,12 @@ export function desaturate(hex: string, amount: number): string {
   const l = 0.3 * r + 0.59 * g + 0.11 * b;
   return mix(hex, toHex([l, l, l]), amount);
 }
+
+// Oscurece hacia el marrón de la tinta, no al negro puro: los bordes quedan cálidos.
+export function darken(hex: string, amount: number): string {
+  return mix(hex, '#2a241c', amount);
+}
+
+export function lighten(hex: string, amount: number): string {
+  return mix(hex, '#ffffff', amount);
+}

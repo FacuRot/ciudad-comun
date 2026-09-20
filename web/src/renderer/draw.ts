@@ -1,9 +1,9 @@
 // Dibuja la ciudad entera en cada cuadro. Sin optimizaciones: son ~100 celdas.
-import type { MapBarrio as Barrio, MapLot as Lot, MapWork as PublicWork } from '../types/game';
+import type { BuildingType, MapBarrio as Barrio, MapLot as Lot, MapWork as PublicWork } from '../types/game';
 import { workPercent, type Cell } from '../game/geo';
-import { BUILDING_GLYPH, formatRemaining } from '../game/format';
+import { formatRemaining } from '../game/format';
 import type { Layout } from './layout';
-import { ABANDONED, desaturate, lotColor, mix } from './colors';
+import { ABANDONED, darken, desaturate, lighten, lotColor, mix } from './colors';
 import { phaseAt, type Phase } from './time';
 
 export type LotMark = 'claimable' | 'suggested' | 'blocked';
@@ -23,20 +23,83 @@ export type Scene = {
   hovered?: Cell | null;
 };
 
-const THEME: Record<Phase, { ground: string; street: string; ink: string; overlay: string | null }> = {
-  dia: { ground: '#efe9da', street: '#d3ccbc', ink: '#3b3a36', overlay: null },
-  atardecer: { ground: '#eadbc6', street: '#cdbba6', ink: '#3b3a36', overlay: 'rgba(255, 140, 60, 0.10)' },
-  noche: { ground: '#efe9da', street: '#d3ccbc', ink: '#f1ecdf', overlay: 'rgba(16, 24, 48, 0.58)' },
+type Theme = {
+  ground: string; // el suelo de afuera, donde no llega la ciudad
+  board: string; // el terreno de la ciudad
+  sidewalk: string; // vereda
+  asphalt: string; // calzada
+  line: string; // marcas pintadas de la calle
+  ink: string;
+  overlay: string | null;
+};
+
+const DAY: Theme = {
+  ground: '#ded6c1',
+  board: '#efe9da',
+  sidewalk: '#e0d8c5',
+  asphalt: '#b3ada0',
+  line: 'rgba(255, 252, 240, 0.85)',
+  ink: '#3b3a36',
+  overlay: null,
+};
+
+const THEME: Record<Phase, Theme> = {
+  dia: DAY,
+  atardecer: {
+    ...DAY,
+    ground: '#d6c3a8',
+    board: '#eadbc6',
+    sidewalk: '#dccbb2',
+    asphalt: '#aea08f',
+    line: 'rgba(255, 246, 228, 0.8)',
+    overlay: 'rgba(255, 140, 60, 0.10)',
+  },
+  noche: { ...DAY, ink: '#f1ecdf', overlay: 'rgba(16, 24, 48, 0.58)' },
 };
 
 const ACCENT = '#2b8a80';
 const WORKING = '#e8910c';
+const FOLIAGE = ['#6f9440', '#83a84e', '#5d8237'];
+const TRUNK = '#8a6a45';
 // Lado del edificio respecto del tile, por nivel (0 = sin edificio).
-const BUILDING_SIZE = [0, 0.42, 0.58, 0.74];
+const BUILDING_SIZE = [0, 0.38, 0.5, 0.62];
+// Dónde se apoya el edificio dentro del lote: deja aire abajo para la sombra y el pasto.
+const BASE = 0.78;
+// Dónde arranca el cuerpo dentro de la caja del edificio: de ahí cuelgan las ventanas de noche.
+const BODY_TOP: Record<BuildingType, number> = { ladrilleria: 0.26, aserradero: 0.44, generador: 0.34, plaza: 0.5 };
 
-function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+function roundRect(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  r: number | number[],
+) {
   ctx.beginPath();
   ctx.roundRect(x, y, w, h, r);
+}
+
+// Número estable entre 0 y 1: da variedad a los tiles sin que titilen entre cuadros.
+function hash01(seed: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < seed.length; i++) {
+    h ^= seed.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return ((h >>> 0) % 1024) / 1024;
+}
+
+function softShadow(ctx: CanvasRenderingContext2D, blur: number, dy: number, alpha = 0.18) {
+  ctx.shadowColor = `rgba(38, 32, 24, ${alpha})`;
+  ctx.shadowBlur = blur;
+  ctx.shadowOffsetY = dy;
+}
+
+function clearShadow(ctx: CanvasRenderingContext2D) {
+  ctx.shadowColor = 'transparent';
+  ctx.shadowBlur = 0;
+  ctx.shadowOffsetY = 0;
 }
 
 export function drawScene(ctx: CanvasRenderingContext2D, layout: Layout, scene: Scene, now: number) {
@@ -48,14 +111,15 @@ export function drawScene(ctx: CanvasRenderingContext2D, layout: Layout, scene: 
   ctx.fillStyle = theme.ground;
   ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
-  // Calles: toda celda que no es lote ni obra.
-  const built = new Set([...scene.lots, ...scene.works].map((c) => `${c.x},${c.y}`));
-  ctx.fillStyle = theme.street;
-  for (let y = 0; y < rows; y++) {
-    for (let x = 0; x < cols; x++) {
-      if (!built.has(`${x},${y}`)) ctx.fillRect(ox + x * t, oy + y * t, t, t);
-    }
-  }
+  // La ciudad es una tabla apoyada sobre el fondo: sombra suave y esquinas redondeadas.
+  ctx.save();
+  softShadow(ctx, t * 0.4, t * 0.08, 0.22);
+  ctx.fillStyle = theme.board;
+  roundRect(ctx, ox, oy, cols * t, rows * t, t * 0.22);
+  ctx.fill();
+  ctx.restore();
+
+  drawStreets(ctx, layout, scene, theme);
 
   for (const lot of scene.lots) {
     const { px, py } = at(lot);
@@ -72,12 +136,12 @@ export function drawScene(ctx: CanvasRenderingContext2D, layout: Layout, scene: 
     ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
   }
 
-  // De noche, ventanas encendidas donde hay gente.
+  // De noche, luces encendidas donde hay gente.
   if (night) {
     for (const lot of scene.lots) {
-      if (lot.status === 'ocupado' && lot.state === 'activo' && lot.level > 0) {
+      if (lot.status === 'ocupado' && lot.state === 'activo' && lot.level > 0 && lot.building_type) {
         const { px, py } = at(lot);
-        drawWindows(ctx, lot.level, px, py, t);
+        drawNightLights(ctx, lot.building_type, lot.level, px, py, t);
       }
     }
   }
@@ -101,11 +165,13 @@ export function drawScene(ctx: CanvasRenderingContext2D, layout: Layout, scene: 
   // Textos por encima del filtro de noche.
   for (const work of scene.works) {
     const { px, py } = at(work);
+    ctx.save();
     ctx.fillStyle = theme.ink;
-    ctx.font = `600 ${Math.round(t * 0.17)}px system-ui, sans-serif`;
+    ctx.font = `600 ${Math.round(t * 0.15)}px system-ui, sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(work.name, px + t / 2, py + t * 0.4);
+    ctx.fillText(work.name, px + t / 2, py + t * 0.14);
+    ctx.restore();
   }
   drawClosedBarrios(ctx, scene, layout, theme.ink);
 
@@ -115,25 +181,26 @@ export function drawScene(ctx: CanvasRenderingContext2D, layout: Layout, scene: 
     const { px, py } = at(lot);
     ctx.strokeStyle = id === scene.selectedLotId ? ACCENT : theme.ink;
     ctx.lineWidth = Math.max(2, t * 0.05);
-    roundRect(ctx, px + t * 0.035, py + t * 0.035, t * 0.93, t * 0.93, t * 0.1);
+    roundRect(ctx, px + t * 0.03, py + t * 0.03, t * 0.94, t * 0.94, t * 0.2);
     ctx.stroke();
   }
 
   const selectedWork = scene.selectedWorkId ? scene.works.find((w) => w.id === scene.selectedWorkId) : null;
   if (selectedWork) {
     const { px, py } = at(selectedWork);
-    const out = t * 0.04;
+    const out = t * 0.05;
     ctx.strokeStyle = ACCENT;
     ctx.lineWidth = Math.max(2, t * 0.05);
-    roundRect(ctx, px - out, py - out, t + out * 2, t + out * 2, t * 0.06);
+    roundRect(ctx, px - out, py - out, t + out * 2, t + out * 2, t * 0.16);
     ctx.stroke();
   }
 
   if (scene.hovered) {
     const { px, py } = at(scene.hovered);
-    ctx.strokeStyle = night ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.35)';
+    ctx.strokeStyle = night ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.3)';
     ctx.lineWidth = 1.5;
-    ctx.strokeRect(px + 0.75, py + 0.75, t - 1.5, t - 1.5);
+    roundRect(ctx, px + t * 0.03, py + t * 0.03, t * 0.94, t * 0.94, t * 0.2);
+    ctx.stroke();
 
     // Reloj con lo que falta sobre la construcción que está bajo el cursor (o el dedo).
     const lot = scene.lots.find((l) => l.x === scene.hovered!.x && l.y === scene.hovered!.y);
@@ -142,11 +209,165 @@ export function drawScene(ctx: CanvasRenderingContext2D, layout: Layout, scene: 
   }
 }
 
+// --- Calles ------------------------------------------------------------
+// Toda celda que no es lote ni obra es calle. Cada una se dibuja como vereda entera
+// más una calzada que se estira hacia las celdas de calle vecinas: así las cuadras
+// se encadenan en avenidas continuas en vez de quedar como cuadrados sueltos.
+function drawStreets(ctx: CanvasRenderingContext2D, layout: Layout, scene: Scene, theme: Theme) {
+  const { tile: t, ox, oy, cols, rows } = layout;
+  const built = new Set([...scene.lots, ...scene.works].map((c) => `${c.x},${c.y}`));
+  // Fuera de la grilla la calle sigue: así las avenidas salen del tablero en vez de cortarse.
+  const isStreet = (x: number, y: number) => x < 0 || y < 0 || x >= cols || y >= rows || !built.has(`${x},${y}`);
+  const inside = (x: number, y: number) => x >= 0 && y >= 0 && x < cols && y < rows;
+  const isCrossing = (x: number, y: number) =>
+    isStreet(x, y) &&
+    [isStreet(x, y - 1), isStreet(x, y + 1), isStreet(x - 1, y), isStreet(x + 1, y)].filter(Boolean).length >= 3;
+
+  const curb = t * 0.17;
+  const cells: { x: number; y: number; px: number; py: number; n: boolean; s: boolean; e: boolean; w: boolean }[] = [];
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      if (built.has(`${x},${y}`)) continue;
+      cells.push({
+        x,
+        y,
+        px: ox + x * t,
+        py: oy + y * t,
+        n: isStreet(x, y - 1),
+        s: isStreet(x, y + 1),
+        e: isStreet(x + 1, y),
+        w: isStreet(x - 1, y),
+      });
+    }
+  }
+
+  // Vereda: la celda entera.
+  ctx.fillStyle = theme.sidewalk;
+  for (const c of cells) ctx.fillRect(c.px, c.py, t, t);
+
+  // Calzada: se estira hasta el borde por los lados donde la calle sigue.
+  ctx.fillStyle = theme.asphalt;
+  const r = t * 0.16;
+  for (const c of cells) {
+    roundRect(
+      ctx,
+      c.px + (c.w ? 0 : curb),
+      c.py + (c.n ? 0 : curb),
+      t - (c.w ? 0 : curb) - (c.e ? 0 : curb),
+      t - (c.n ? 0 : curb) - (c.s ? 0 : curb),
+      // Solo se redondea la esquina que no tiene continuidad por ninguno de sus dos lados.
+      [!c.n && !c.w ? r : 0, !c.n && !c.e ? r : 0, !c.s && !c.e ? r : 0, !c.s && !c.w ? r : 0],
+    );
+    ctx.fill();
+  }
+
+  // Cordón: una línea clara al filo de la vereda, del lado que da a los lotes.
+  const lip = Math.max(1, t * 0.022);
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+  for (const c of cells) {
+    const across = t - (c.w ? 0 : curb) - (c.e ? 0 : curb);
+    const down = t - (c.n ? 0 : curb) - (c.s ? 0 : curb);
+    if (!c.n) ctx.fillRect(c.px + (c.w ? 0 : curb), c.py + curb - lip, across, lip);
+    if (!c.s) ctx.fillRect(c.px + (c.w ? 0 : curb), c.py + t - curb, across, lip);
+    if (!c.w) ctx.fillRect(c.px + curb - lip, c.py + (c.n ? 0 : curb), lip, down);
+    if (!c.e) ctx.fillRect(c.px + t - curb, c.py + (c.n ? 0 : curb), lip, down);
+  }
+
+  // Línea de eje: dos rayas por celda, con la misma separación dentro y entre celdas.
+  const mark = Math.max(1.2, t * 0.03);
+  ctx.fillStyle = theme.line;
+  for (const c of cells) {
+    // En los cruces no se pinta: la raya se corta como en cualquier esquina.
+    if ((c.e && c.w) === (c.n && c.s)) continue;
+    for (const [a, b] of [
+      [0.12, 0.38],
+      [0.62, 0.88],
+    ]) {
+      if (c.e && c.w) ctx.fillRect(c.px + t * a, c.py + t / 2 - mark / 2, t * (b - a), mark);
+      else ctx.fillRect(c.px + t / 2 - mark / 2, c.py + t * a, mark, t * (b - a));
+    }
+  }
+
+  // Sendas peatonales al llegar a un cruce. Recién se leen de cerca.
+  if (t >= 34) {
+    ctx.fillStyle = 'rgba(255, 252, 240, 0.72)';
+    for (const c of cells) {
+      if (inside(c.x, c.y - 1) && isCrossing(c.x, c.y - 1)) zebra(ctx, c.px, c.py, t, curb, 'n');
+      if (inside(c.x, c.y + 1) && isCrossing(c.x, c.y + 1)) zebra(ctx, c.px, c.py, t, curb, 's');
+      if (inside(c.x - 1, c.y) && isCrossing(c.x - 1, c.y)) zebra(ctx, c.px, c.py, t, curb, 'w');
+      if (inside(c.x + 1, c.y) && isCrossing(c.x + 1, c.y)) zebra(ctx, c.px, c.py, t, curb, 'e');
+    }
+  }
+
+  // Arbolitos en la vereda: el sorteo sale del lugar, así que son siempre los mismos.
+  if (t >= 26) {
+    for (const c of cells) {
+      if (isCrossing(c.x, c.y)) continue;
+      for (const side of ['n', 's', 'e', 'w'] as const) {
+        if (c[side]) continue;
+        const h = hash01(`${c.x},${c.y},${side}`);
+        if (h > 0.48) continue;
+        const along = h < 0.24 ? 0.28 : 0.72;
+        const mid = curb / 2;
+        const cx = side === 'n' || side === 's' ? c.px + t * along : c.px + (side === 'w' ? mid : t - mid);
+        const cy = side === 'e' || side === 'w' ? c.py + t * along : c.py + (side === 'n' ? mid : t - mid);
+        drawTree(ctx, cx, cy + curb * 0.4, t * 0.19);
+      }
+    }
+  }
+}
+
+// Senda peatonal: cuatro bastones cruzados a la calzada, junto al borde que da al cruce.
+function zebra(
+  ctx: CanvasRenderingContext2D,
+  px: number,
+  py: number,
+  t: number,
+  curb: number,
+  side: 'n' | 's' | 'e' | 'w',
+) {
+  const bar = t * 0.04; // ancho de cada bastón
+  const step = t * 0.055; // cuánto se repiten hacia adentro
+  const edge = t * 0.03;
+  const span = t - curb * 2; // la calzada, de cordón a cordón
+  for (let i = 0; i < 4; i++) {
+    const d = edge + i * step;
+    if (side === 'n') ctx.fillRect(px + curb, py + d, span, bar);
+    if (side === 's') ctx.fillRect(px + curb, py + t - d - bar, span, bar);
+    if (side === 'w') ctx.fillRect(px + d, py + curb, bar, span);
+    if (side === 'e') ctx.fillRect(px + t - d - bar, py + curb, bar, span);
+  }
+}
+
+// Un árbol: tronco y tres copas que se pisan, para que no quede un círculo perfecto.
+function drawTree(ctx: CanvasRenderingContext2D, cx: number, baseY: number, size: number) {
+  ctx.save();
+  ctx.fillStyle = 'rgba(38, 32, 24, 0.14)';
+  ctx.beginPath();
+  ctx.ellipse(cx, baseY, size * 0.34, size * 0.11, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = TRUNK;
+  ctx.fillRect(cx - size * 0.07, baseY - size * 0.36, size * 0.14, size * 0.36);
+  const copas: [number, number, number, string][] = [
+    [-0.24, -0.52, 0.3, FOLIAGE[2]],
+    [0.22, -0.5, 0.28, FOLIAGE[0]],
+    [-0.02, -0.72, 0.31, FOLIAGE[1]],
+  ];
+  for (const [dx, dy, r, fill] of copas) {
+    ctx.fillStyle = fill;
+    ctx.beginPath();
+    ctx.arc(cx + size * dx, baseY + size * dy, size * r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+// --- Lotes -------------------------------------------------------------
 // Dos trazos que dan una vuelta al lote cada 4 segundos.
 function drawWorking(ctx: CanvasRenderingContext2D, px: number, py: number, t: number, now: number) {
-  const pad = t * 0.07;
+  const pad = t * 0.06;
   const s = t - pad * 2;
-  const r = t * 0.08;
+  const r = t * 0.18;
   const perimeter = 4 * (s - 2 * r) + 2 * Math.PI * r;
   const seg = perimeter * 0.16;
   ctx.save();
@@ -175,9 +396,11 @@ function drawClock(ctx: CanvasRenderingContext2D, px: number, py: number, t: num
   const above = py - h - t * 0.06;
   const y = above >= 4 ? above : py + t + t * 0.06;
 
+  softShadow(ctx, fs * 0.6, fs * 0.15, 0.3);
   ctx.fillStyle = 'rgba(30, 30, 28, 0.92)';
   roundRect(ctx, x, y, w, h, h / 2);
   ctx.fill();
+  clearShadow(ctx);
 
   const cx = x + fs * 0.5 + r;
   const cy = y + h / 2;
@@ -200,9 +423,9 @@ function drawClock(ctx: CanvasRenderingContext2D, px: number, py: number, t: num
 }
 
 function drawLot(ctx: CanvasRenderingContext2D, lot: Lot, px: number, py: number, t: number, scene: Scene, now: number) {
-  const pad = t * 0.07;
+  const pad = t * 0.06;
   const s = t - pad * 2;
-  const r = t * 0.08;
+  const r = t * 0.2;
 
   if (lot.status === 'cerrado') {
     ctx.fillStyle = 'rgba(0, 0, 0, 0.035)';
@@ -213,6 +436,10 @@ function drawLot(ctx: CanvasRenderingContext2D, lot: Lot, px: number, py: number
 
   if (lot.status === 'libre') {
     const mark = scene.marks?.get(lot.id);
+    // Terreno baldío: un verde tenue, para que se lea como lote y no como un hueco.
+    ctx.fillStyle = 'rgba(126, 146, 86, 0.12)';
+    roundRect(ctx, px + pad, py + pad, s, s, r);
+    ctx.fill();
     if (mark === 'suggested') {
       const pulse = 0.5 + 0.5 * Math.sin(now / 350);
       ctx.fillStyle = `rgba(43, 138, 128, ${0.1 + 0.22 * pulse})`;
@@ -238,57 +465,303 @@ function drawLot(ctx: CanvasRenderingContext2D, lot: Lot, px: number, py: number
   if (lot.state === 'descuidado') color = desaturate(color, 0.5);
   if (lot.state === 'abandonado') color = ABANDONED;
 
-  ctx.fillStyle = mix(color, '#ffffff', 0.6);
+  ctx.save();
+  softShadow(ctx, t * 0.12, t * 0.03, 0.16);
+  const plot = ctx.createLinearGradient(0, py + pad, 0, py + pad + s);
+  plot.addColorStop(0, lighten(color, 0.74));
+  plot.addColorStop(1, lighten(color, 0.52));
+  ctx.fillStyle = plot;
   roundRect(ctx, px + pad, py + pad, s, s, r);
   ctx.fill();
-  ctx.strokeStyle = color;
-  ctx.lineWidth = Math.max(1, t * 0.03);
+  clearShadow(ctx);
+  ctx.strokeStyle = lighten(color, 0.1);
+  ctx.lineWidth = Math.max(1, t * 0.028);
   ctx.stroke();
 
+  // Lo que se dibuje adentro queda recortado al lote: ni el humo ni un techo se derraman al vecino.
+  roundRect(ctx, px + pad, py + pad, s, s, r);
+  ctx.clip();
   if (lot.level > 0 && lot.building_type) {
-    const bs = t * BUILDING_SIZE[lot.level];
-    const bx = px + (t - bs) / 2;
-    const by = py + (t - bs) / 2;
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.18)';
-    roundRect(ctx, bx, by + t * 0.05, bs, bs, t * 0.05);
+    drawBuilding(ctx, lot.building_type, lot.level, px, py, t, color, lot.state === 'activo', now, lot.id);
+  }
+  ctx.restore();
+}
+
+// Caja donde entra el edificio: crece con el nivel y se apoya siempre a la misma altura.
+function buildingBox(level: number, px: number, py: number, t: number) {
+  const s = t * BUILDING_SIZE[level];
+  return { x: px + (t - s) / 2, y: py + t * BASE - s, s };
+}
+
+function drawBuilding(
+  ctx: CanvasRenderingContext2D,
+  type: BuildingType,
+  level: number,
+  px: number,
+  py: number,
+  t: number,
+  color: string,
+  activo: boolean,
+  now: number,
+  seed: string,
+) {
+  if (type === 'plaza') {
+    drawPlaza(ctx, level, px, py, t, color);
+    return;
+  }
+
+  const { x, y, s } = buildingBox(level, px, py, t);
+  // Sombra en el piso: apoya el edificio sobre el lote.
+  ctx.fillStyle = 'rgba(38, 32, 24, 0.16)';
+  ctx.beginPath();
+  ctx.ellipse(x + s / 2, y + s * 1.01, s * 0.56, s * 0.1, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  if (type === 'ladrilleria') drawLadrilleria(ctx, x, y, s, color, activo, now, seed);
+  if (type === 'aserradero') drawAserradero(ctx, x, y, s, color);
+  if (type === 'generador') drawGenerador(ctx, x, y, s, color);
+}
+
+// Cuerpo común: un poco de luz arriba y sombra abajo, con las esquinas redondeadas.
+function body(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, color: string, r: number) {
+  const g = ctx.createLinearGradient(0, y, 0, y + h);
+  g.addColorStop(0, lighten(color, 0.14));
+  g.addColorStop(1, darken(color, 0.12));
+  ctx.fillStyle = g;
+  roundRect(ctx, x, y, w, h, r);
+  ctx.fill();
+}
+
+// Ladrillería: horno con chimenea humeante y unas hiladas de ladrillo.
+function drawLadrilleria(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  s: number,
+  color: string,
+  activo: boolean,
+  now: number,
+  seed: string,
+) {
+  const top = y + s * BODY_TOP.ladrilleria;
+  const h = y + s - top;
+  body(ctx, x, top, s, h, color, s * 0.12);
+
+  // Hiladas de ladrillo, trabadas una fila sí y otra no.
+  ctx.save();
+  roundRect(ctx, x, top, s, h, s * 0.12);
+  ctx.clip();
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.22)';
+  ctx.lineWidth = Math.max(0.8, s * 0.02);
+  const rows = 4;
+  for (let i = 1; i <= rows; i++) {
+    const ly = top + (h * i) / (rows + 1);
+    ctx.beginPath();
+    ctx.moveTo(x, ly);
+    ctx.lineTo(x + s, ly);
+    ctx.stroke();
+    for (let j = 0; j < 3; j++) {
+      const lx = x + s * (i % 2 ? 0.17 : 0.34) + (s * j) / 3;
+      ctx.beginPath();
+      ctx.moveTo(lx, ly);
+      ctx.lineTo(lx, ly + h / (rows + 1));
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+
+  // Techo y chimenea.
+  const chx = x + s * (hash01(seed) < 0.5 ? 0.14 : 0.68);
+  ctx.fillStyle = darken(color, 0.34);
+  roundRect(ctx, chx, y + s * 0.01, s * 0.18, s * 0.32, [s * 0.06, s * 0.06, 0, 0]);
+  ctx.fill();
+  roundRect(ctx, x - s * 0.06, top - s * 0.1, s * 1.12, s * 0.15, s * 0.07);
+  ctx.fill();
+
+  if (!activo) return;
+  // Tres bocanadas que suben y se abren. El ciclo es largo: no distrae.
+  ctx.save();
+  for (let i = 0; i < 3; i++) {
+    const phase = (now / 3400 + i / 3) % 1;
+    ctx.globalAlpha = 0.32 * (1 - phase);
+    ctx.fillStyle = '#f6f2e8';
+    ctx.beginPath();
+    ctx.arc(
+      chx + s * 0.09 + s * 0.09 * phase,
+      y - s * 0.03 - s * 0.3 * phase,
+      s * (0.06 + 0.08 * phase),
+      0,
+      Math.PI * 2,
+    );
     ctx.fill();
-    ctx.fillStyle = color;
-    roundRect(ctx, bx, by, bs, bs, t * 0.05);
+  }
+  ctx.restore();
+}
+
+// Aserradero: galpón de techo a dos aguas con troncos apilados al costado.
+function drawAserradero(ctx: CanvasRenderingContext2D, x: number, y: number, s: number, color: string) {
+  const top = y + s * BODY_TOP.aserradero;
+  body(ctx, x + s * 0.08, top, s * 0.84, y + s - top, color, s * 0.1);
+
+  // Portón.
+  ctx.fillStyle = darken(color, 0.3);
+  roundRect(ctx, x + s * 0.36, y + s * 0.68, s * 0.3, s * 0.32, [s * 0.09, s * 0.09, 0, 0]);
+  ctx.fill();
+
+  // Techo: triángulo trazado con uniones redondeadas para que no pinche.
+  ctx.save();
+  ctx.fillStyle = darken(color, 0.36);
+  ctx.strokeStyle = darken(color, 0.36);
+  ctx.lineWidth = s * 0.1;
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(x + s * 0.04, top + s * 0.04);
+  ctx.lineTo(x + s * 0.5, y + s * 0.11);
+  ctx.lineTo(x + s * 0.96, top + s * 0.04);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+
+  // Troncos apilados: dos abajo y uno arriba.
+  const lr = s * 0.1;
+  for (const [dx, dy] of [
+    [0.03, 0.9],
+    [0.21, 0.9],
+    [0.12, 0.73],
+  ]) {
+    ctx.fillStyle = TRUNK;
+    ctx.beginPath();
+    ctx.arc(x + s * dx, y + s * dy, lr, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-    ctx.font = `${Math.round(t * 0.26)}px system-ui, sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(BUILDING_GLYPH[lot.building_type], px + t / 2, py + t / 2 + 1);
+    ctx.fillStyle = lighten(TRUNK, 0.38);
+    ctx.beginPath();
+    ctx.arc(x + s * dx, y + s * dy, lr * 0.44, 0, Math.PI * 2);
+    ctx.fill();
   }
 }
 
-function drawWindows(ctx: CanvasRenderingContext2D, level: number, px: number, py: number, t: number) {
-  const bs = t * BUILDING_SIZE[level];
-  const bx = px + (t - bs) / 2;
-  const by = py + (t - bs) / 2;
-  const w = Math.max(2, t * 0.07);
+// Generador: nave baja con un rayo pintado y una torre al costado.
+function drawGenerador(ctx: CanvasRenderingContext2D, x: number, y: number, s: number, color: string) {
+  ctx.fillStyle = darken(color, 0.3);
+  roundRect(ctx, x + s * 0.7, y, s * 0.2, s * 0.62, [s * 0.09, s * 0.09, 0, 0]);
+  ctx.fill();
+  ctx.fillStyle = lighten(color, 0.3);
+  roundRect(ctx, x + s * 0.66, y + s * 0.05, s * 0.28, s * 0.08, s * 0.04);
+  ctx.fill();
+
+  const top = y + s * BODY_TOP.generador;
+  body(ctx, x + s * 0.04, top, s * 0.78, y + s - top, color, s * 0.12);
+  ctx.fillStyle = darken(color, 0.34);
+  roundRect(ctx, x, top - s * 0.09, s * 0.86, s * 0.13, s * 0.06);
+  ctx.fill();
+
+  // Rayo.
+  const bx = x + s * 0.18;
+  const by = y + s * 0.52;
+  const bw = s * 0.36;
+  const bh = s * 0.38;
+  const bolt: [number, number][] = [
+    [0.6, 0],
+    [0.12, 0.56],
+    [0.42, 0.56],
+    [0.32, 1],
+    [0.88, 0.4],
+    [0.54, 0.4],
+  ];
+  ctx.save();
+  ctx.fillStyle = '#ffd257';
+  ctx.strokeStyle = '#ffd257';
+  ctx.lineWidth = s * 0.05;
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  bolt.forEach(([fx, fy], i) =>
+    i === 0 ? ctx.moveTo(bx + bw * fx, by + bh * fy) : ctx.lineTo(bx + bw * fx, by + bh * fy),
+  );
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+}
+
+// Plaza: cantero con un camino y tantos árboles como nivel tiene.
+function drawPlaza(ctx: CanvasRenderingContext2D, level: number, px: number, py: number, t: number, color: string) {
+  ctx.fillStyle = mix('#93b45c', color, 0.2);
+  roundRect(ctx, px + t * 0.15, py + t * 0.2, t * 0.7, t * 0.62, t * 0.26);
+  ctx.fill();
+
+  // Camino que la cruza.
+  ctx.fillStyle = 'rgba(243, 236, 218, 0.8)';
+  roundRect(ctx, px + t * 0.15, py + t * 0.63, t * 0.7, t * 0.1, t * 0.05);
+  ctx.fill();
+
+  const arboles: [number, number, number][] = [
+    [0.37, 0.61, 0.28],
+    [0.65, 0.55, 0.22],
+    [0.5, 0.79, 0.19],
+  ];
+  for (let i = 0; i < Math.min(level, 3); i++) {
+    const [fx, fy, size] = arboles[i];
+    drawTree(ctx, px + t * fx, py + t * fy, t * size);
+  }
+
+  if (level >= 3) {
+    // Banquito al costado del camino.
+    ctx.fillStyle = TRUNK;
+    roundRect(ctx, px + t * 0.62, py + t * 0.75, t * 0.17, t * 0.045, t * 0.02);
+    ctx.fill();
+  }
+}
+
+// De noche: ventanas encendidas, o faroles si el lote es una plaza.
+function drawNightLights(
+  ctx: CanvasRenderingContext2D,
+  type: BuildingType,
+  level: number,
+  px: number,
+  py: number,
+  t: number,
+) {
   ctx.save();
   ctx.fillStyle = '#ffd866';
   ctx.shadowColor = 'rgba(255, 210, 90, 0.9)';
-  ctx.shadowBlur = t * 0.15;
+  ctx.shadowBlur = t * 0.16;
+
+  if (type === 'plaza') {
+    const faroles: [number, number][] = [
+      [0.24, 0.55],
+      [0.78, 0.55],
+      [0.5, 0.3],
+    ];
+    for (let i = 0; i < Math.min(level, 3); i++) {
+      ctx.beginPath();
+      ctx.arc(px + t * faroles[i][0], py + t * faroles[i][1], Math.max(1.6, t * 0.032), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+    return;
+  }
+
+  const { x, y, s } = buildingBox(level, px, py, t);
+  const top = y + s * BODY_TOP[type];
+  const w = Math.max(2, s * 0.14);
   for (let i = 0; i < level; i++) {
-    ctx.fillRect(bx + (bs * (i + 1)) / (level + 1) - w / 2, by + bs * 0.2, w, w);
+    ctx.fillRect(x + (s * (i + 1)) / (level + 1) - w / 2, top + s * 0.15, w, w);
   }
   ctx.restore();
 }
 
 // Lote descuidado: pasto crecido en la base (docs/07, "El canvas").
 function drawGrass(ctx: CanvasRenderingContext2D, px: number, py: number, t: number) {
-  const base = py + t * 0.88;
+  const base = py + t * 0.89;
   ctx.save();
   ctx.strokeStyle = '#6f7d3a';
-  ctx.lineWidth = Math.max(1.2, t * 0.035);
+  ctx.lineWidth = Math.max(1.2, t * 0.026);
   ctx.lineCap = 'round';
-  [-0.26, -0.13, 0, 0.13, 0.26].forEach((d, i) => {
+  [-0.3, -0.2, -0.1, 0, 0.1, 0.2, 0.3].forEach((d, i) => {
     const x = px + t / 2 + d * t;
-    const h = t * (i % 2 ? 0.13 : 0.19);
-    const lean = (i % 2 ? 1 : -1) * t * 0.045;
+    const h = t * (i % 2 ? 0.1 : 0.15);
+    const lean = (i % 2 ? 1 : -1) * t * 0.04;
     ctx.beginPath();
     ctx.moveTo(x, base);
     ctx.quadraticCurveTo(x + lean * 0.5, base - h * 0.6, x + lean, base - h);
@@ -298,16 +771,18 @@ function drawGrass(ctx: CanvasRenderingContext2D, px: number, py: number, t: num
 }
 
 // Lote abandonado: una mano en una chapita, para que el vecino vea que puede cuidarlo.
-// Los dedos van verticales y rectos: a este tamaño, redondeados se confunden con el glifo de la plaza.
+// Los dedos van verticales y rectos: a este tamaño, redondeados se confunden con otras formas.
 function drawCare(ctx: CanvasRenderingContext2D, px: number, py: number, t: number) {
   const r = Math.max(9, t * 0.19);
   const cx = px + t - r - t * 0.04;
   const cy = py + r + t * 0.04;
   ctx.save();
+  softShadow(ctx, r * 0.5, r * 0.12, 0.28);
   ctx.fillStyle = ACCENT;
   ctx.beginPath();
   ctx.arc(cx, cy, r, 0, Math.PI * 2);
   ctx.fill();
+  clearShadow(ctx);
 
   ctx.fillStyle = '#fff';
   const w = r * 0.17; // ancho de cada dedo
@@ -334,30 +809,72 @@ function drawCare(ctx: CanvasRenderingContext2D, px: number, py: number, t: numb
   ctx.restore();
 }
 
+// --- Obra pública ------------------------------------------------------
+// Ocupa más que un lote, con doble borde, un edificio con frontón y la barra de progreso.
 function drawWork(ctx: CanvasRenderingContext2D, work: PublicWork, px: number, py: number, t: number) {
-  const out = t * 0.04;
+  const out = t * 0.05;
   const x = px - out;
   const y = py - out;
   const s = t + out * 2;
   const done = work.status === 'completada';
+  const stone = done ? '#f1e6c0' : '#e7e0ce';
+  const trim = done ? '#b4922c' : '#8d8676';
 
-  ctx.fillStyle = done ? '#eadba8' : '#dcd5c5';
-  roundRect(ctx, x, y, s, s, t * 0.06);
+  ctx.save();
+  softShadow(ctx, t * 0.18, t * 0.05, 0.24);
+  ctx.fillStyle = stone;
+  roundRect(ctx, x, y, s, s, t * 0.16);
   ctx.fill();
-  ctx.strokeStyle = '#6d675b';
-  ctx.lineWidth = Math.max(1, t * 0.025);
+  clearShadow(ctx);
+  ctx.strokeStyle = trim;
+  ctx.lineWidth = Math.max(1, t * 0.03);
   ctx.stroke();
-  roundRect(ctx, x + t * 0.07, y + t * 0.07, s - t * 0.14, s - t * 0.14, t * 0.04);
+  ctx.globalAlpha = 0.5;
+  roundRect(ctx, x + t * 0.07, y + t * 0.07, s - t * 0.14, s - t * 0.14, t * 0.11);
   ctx.stroke();
+  ctx.globalAlpha = 1;
 
-  const bw = s - t * 0.3;
-  const bh = Math.max(3, t * 0.09);
-  const bx = x + t * 0.15;
-  const by = y + s - t * 0.27;
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
-  ctx.fillRect(bx, by, bw, bh);
+  // Edificio cívico: escalinata, columnas y frontón. Arranca debajo del nombre.
+  const bw = s * 0.56;
+  const bx = x + (s - bw) / 2;
+  const floor = y + s * 0.72;
+  ctx.fillStyle = 'rgba(38, 32, 24, 0.13)';
+  roundRect(ctx, bx - s * 0.08, floor, bw + s * 0.16, s * 0.05, s * 0.02);
+  ctx.fill();
+
+  ctx.fillStyle = '#fbf6e9';
+  ctx.fillRect(bx, y + s * 0.46, bw, s * 0.26);
+  ctx.fillStyle = trim;
+  for (let i = 0; i < 4; i++) {
+    ctx.fillRect(bx + s * 0.04 + (i * (bw - s * 0.125)) / 3, y + s * 0.48, s * 0.045, s * 0.22);
+  }
+
+  ctx.save();
+  ctx.fillStyle = '#fbf6e9';
+  ctx.strokeStyle = '#fbf6e9';
+  ctx.lineWidth = s * 0.05;
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(bx - s * 0.05, y + s * 0.46);
+  ctx.lineTo(x + s / 2, y + s * 0.33);
+  ctx.lineTo(bx + bw + s * 0.05, y + s * 0.46);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+
+  // Barra de progreso.
+  const pw = s - t * 0.3;
+  const ph = Math.max(3, t * 0.085);
+  const bar = x + t * 0.15;
+  const barY = y + s - t * 0.21;
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.14)';
+  roundRect(ctx, bar, barY, pw, ph, ph / 2);
+  ctx.fill();
   ctx.fillStyle = done ? '#c9a227' : ACCENT;
-  ctx.fillRect(bx, by, (bw * workPercent(work)) / 100, bh);
+  roundRect(ctx, bar, barY, Math.max(ph, (pw * workPercent(work)) / 100), ph, ph / 2);
+  ctx.fill();
+  ctx.restore();
 }
 
 // Barrios cerrados: casi invisibles, con el nombre en gris y "se abre pronto".

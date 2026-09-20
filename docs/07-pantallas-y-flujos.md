@@ -55,14 +55,15 @@ Barra superior: jornadas (con puntos llenos/vacíos, 6 posiciones) e inventario.
 
 ### El canvas
 
-- Grilla 12×8, tile de tamaño fijo, calles en gris.
-- Cada lote es un rectángulo del color elegido por el dueño. El nivel se ve por el tamaño del rectángulo interior (nivel 1 chico, nivel 3 casi lleno) y por una sombra en la base.
-- Tipo de edificio: un glifo simple en el centro (■ ladrillería, ▲ aserradero, ⚡ generador, ✿ plaza). Sin sprites.
+- Grilla 12×8, tile de tamaño fijo. La ciudad se apoya sobre un tablero de esquinas redondeadas con sombra.
+- Calles: vereda, cordón claro y calzada que se encadena entre celdas, con línea de eje punteada, sendas peatonales al llegar a un cruce y arbolitos en la vereda.
+- Cada lote es un cuadrado de esquinas redondeadas en el color elegido por el dueño, con sombra suave. El nivel se ve por el tamaño del edificio (nivel 1 chico, nivel 3 casi lleno) y por una sombra en la base.
+- Tipo de edificio: una silueta propia, no un glifo. Ladrillería: horno con chimenea, que humea mientras el lote está activo. Aserradero: galpón a dos aguas con troncos apilados. Generador: nave con un rayo pintado y una torre al costado. Plaza: cantero con un camino y un árbol por nivel. El glifo (■ ▲ ⚡ ✿) queda solo en los paneles. Sin sprites ni imágenes: todo son formas del canvas.
 - Estado: `activo` color pleno; `descuidado` color desaturado al 50 % con un ícono de pasto; `abandonado` gris con ícono de "cuidar" (una mano) visible.
 - Construcción en curso: borde animado (línea que gira) y un pequeño reloj con el tiempo restante al hacer hover o tocar.
-- Obra pública: celda distinta (más grande visualmente, con borde doble) y una barra de progreso dibujada en la parte inferior.
+- Obra pública: celda distinta (más grande visualmente, con borde doble), un edificio cívico con frontón y columnas, y una barra de progreso dibujada en la parte inferior. Completa, se pone dorada.
 - Lotes libres: borde punteado tenue. Lotes de barrio cerrado: casi invisibles, con el nombre del barrio en gris y "se abre pronto".
-- Día/noche: el fondo del canvas cambia según la hora de la ciudad; de noche los lotes `activo` muestran 1 a 3 puntos amarillos (ventanas).
+- Día/noche: el fondo del canvas cambia según la hora de la ciudad; de noche los lotes `activo` muestran 1 a 3 luces amarillas (ventanas del edificio, o faroles si es una plaza).
 - Hover/tap sobre un lote: tooltip con nombre del lote y apodo del dueño. Click: abre el panel correspondiente.
 - Acercar y alejar: pellizco en el celular, rueda del mouse en escritorio, hasta 4×. Con el mapa acercado, arrastrar lo corre y aparece un botón "Ver toda la ciudad". Nunca se puede alejar más que la ciudad entera, ni correrla más allá del borde. Un arrastre no abre paneles.
 - Redibujo total en cada cambio de estado. Sin optimización.

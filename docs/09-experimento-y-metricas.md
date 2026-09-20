@@ -60,6 +60,8 @@ Las tres tienen que cumplirse. H1 sola es un juego idle más. H2 y H3 sin H1 es 
 
 Todas asumen una sola ciudad. `:start` es `cities.opened_at`.
 
+El archivo sigue estas consultas con dos diferencias, decididas al escribirlo: la base de jugadores va como CTE en cada consulta en lugar de la vista `v_base`, para no crear objetos en la base de la cohorte mientras corre el experimento; y los números que vienen de la config (el tope de jornadas, la zona horaria) se leen de `cities` en vez de escribirse a mano. Antes de la cohorte se corren contra los datos que deja `scripts/bots.sql`, para ver que devuelven números.
+
 ```sql
 -- Base: jugadores que completaron la primera sesión (fundaron y gastaron ≥ 1 jornada el mismo día)
 create or replace view v_base as

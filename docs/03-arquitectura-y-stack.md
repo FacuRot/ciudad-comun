@@ -79,6 +79,8 @@ ciudad-comun/
 │   └── index.html
 └── scripts/
     ├── notify.ts            ← envía avisos pendientes por email (Mago de Oz)
+    ├── bots.sql             ← 30 jugadores falsos, 3 días simulados
+    ├── bots_cleanup.sql     ← los borra y deja la ciudad como el seed
     └── metrics.sql          ← consultas del experimento
 ```
 

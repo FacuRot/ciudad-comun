@@ -100,7 +100,7 @@ Públicas (llamadas desde el cliente, `SECURITY DEFINER`, validan `auth.uid()`):
 Públicas para `anon` (pantalla de entrada, antes de tener jugador): `invitation_info`, `invitation_map`.
 
 Administración (verifican `players.is_admin`):
-`admin_open_barrio`, `admin_city_stats`.
+`admin_open_barrio`, `admin_city_stats`, `admin_pending_notifications`, `admin_mark_notified`, `admin_invitations`.
 
 Internas (no expuestas, usadas por las anteriores y por cron):
 `fx_config`, `fx_collect_production`, `fx_effective_rate`, `fx_lot_state`, `fx_log_event`, `job_refill_jornadas`, `job_update_lot_states`, `job_complete_constructions`, `job_check_barrio_opening`.

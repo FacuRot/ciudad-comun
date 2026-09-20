@@ -3,6 +3,7 @@ import { sb } from './api/client';
 import { loadMe } from './api/reads';
 import { useCity } from './store/city';
 import { navigate, usePath } from './router';
+import { AdminGate } from './screens/AdminScreen';
 import { CityGate } from './screens/CityScreen';
 import { JoinScreen } from './screens/JoinScreen';
 
@@ -13,11 +14,12 @@ export function App() {
 
   const join = path.match(/^\/join\/([^/]+)/);
   useEffect(() => {
-    if (!join && path !== '/city') navigate('/city', true);
+    if (!join && path !== '/city' && path !== '/admin') navigate('/city', true);
   }, [path, join]);
 
   if (!authReady) return <Notice>Cargando…</Notice>;
   if (join) return <JoinScreen token={decodeURIComponent(join[1])} />;
+  if (path === '/admin') return <AdminGate />;
   return <CityGate />;
 }
 

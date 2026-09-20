@@ -79,7 +79,13 @@ Sin costo. Emiten sus eventos.
 Devuelve un token nuevo con `lot_hint` = lote del invitador. El cliente arma la URL `/join/<token>`.
 
 ### Administración
-`admin_force_open_barrio(p_barrio_id)` y `admin_city_stats()`. Requieren `players.is_admin`.
+Todas requieren `players.is_admin` y son lo que consume `/admin` (`07-pantallas-y-flujos.md` §3).
+
+- `admin_city_stats()` → jsonb con el estado de la ciudad.
+- `admin_force_open_barrio(p_barrio_id)` → abre el barrio siguiente a mano.
+- `admin_pending_notifications(p_limit)` → jsonb[] de `notifications_outbox` sin enviar, con el apodo del destinatario. La tabla no es legible bajo RLS ni para el admin: se lee por función.
+- `admin_mark_notified(p_ids)` → marca esos avisos como enviados y devuelve cuántos marcó. Es el modo manual del Mago de Oz. No emite evento: no cambia el estado del juego, solo el registro de envíos.
+- `admin_invitations()` → jsonb[] de invitaciones sin usar, con invitador, lote sugerido y si ya venció.
 
 ## Lecturas
 

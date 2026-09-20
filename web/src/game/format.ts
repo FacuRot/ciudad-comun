@@ -64,3 +64,15 @@ export function daysSince(iso: string): number {
 export function plural(n: number, one: string, many: string): string {
   return `${n} ${n === 1 ? one : many}`;
 }
+
+const whenFormat = new Intl.DateTimeFormat('es-AR', {
+  day: 'numeric',
+  month: 'short',
+  hour: '2-digit',
+  minute: '2-digit',
+});
+
+// "14 sept, 10:32": para el panel de administración, que sí mira la hora.
+export function formatWhen(iso: string): string {
+  return whenFormat.format(new Date(iso));
+}

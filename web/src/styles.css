@@ -579,3 +579,74 @@ a.as-button {
   cursor: pointer;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
 }
+
+/* Administración: una página sin diseño (docs/07 §3). Solo la usa el equipo. */
+.admin {
+  max-width: 60rem;
+  margin: 0 auto;
+  padding: 1rem 1rem 3rem;
+}
+
+.admin header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.admin h1 {
+  margin: 0;
+  font-size: 1.4rem;
+}
+
+.admin h2 {
+  margin: 0 0 0.4rem;
+  font-size: 1.1rem;
+}
+
+.admin h3 {
+  margin: 0.9rem 0 0.2rem;
+  font-size: 0.95rem;
+}
+
+.admin section {
+  margin-top: 1.4rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+}
+
+.admin .facts {
+  margin: 0.2rem 0;
+  padding-left: 1.1rem;
+}
+
+.admin .facts li {
+  padding: 0.12rem 0;
+}
+
+.admin table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+
+.admin th,
+.admin td {
+  padding: 0.35rem 0.5rem 0.35rem 0;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.admin .invite-url {
+  margin-top: 0;
+  min-width: 14rem;
+}
+
+button.secondary.inline {
+  margin-top: 0;
+  margin-left: 0.5rem;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.85rem;
+}

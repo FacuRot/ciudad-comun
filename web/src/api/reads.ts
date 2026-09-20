@@ -2,7 +2,7 @@
 import { sb } from './client';
 import { codeOf, GameError } from './errors';
 import type { CitySnapshot } from '../store/city';
-import type { Inventory, Player } from '../types/game';
+import type { Barrio, Inventory, Player } from '../types/game';
 
 function unwrap<T>(result: { data: T | null; error: { message: string } | null }): T {
   if (result.error) throw new GameError(codeOf(result.error));
@@ -73,4 +73,9 @@ export async function loadMe(uid: string): Promise<{ me: Player | null; inventor
     sb.from('inventories').select('*').eq('player_id', uid).maybeSingle(),
   ]);
   return { me: unwrap(me), inventory: unwrap(inventory) };
+}
+
+// Los barrios solos, para el panel de administración (que no carga la ciudad entera).
+export async function loadBarrios(): Promise<Barrio[]> {
+  return unwrap(await sb.from('barrios').select('*').order('ordinal'));
 }

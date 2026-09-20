@@ -689,9 +689,15 @@ export type Database = {
         Args: { p_barrio_id: string }
         Returns: undefined
       }
+      admin_invitations: { Args: never; Returns: Json }
+      admin_mark_notified: { Args: { p_ids: number[] }; Returns: number }
       admin_open_barrio: {
         Args: { p_barrio_id: string; p_reason?: string }
         Returns: undefined
+      }
+      admin_pending_notifications: {
+        Args: { p_limit?: number }
+        Returns: Json
       }
       build: {
         Args: { p_building_type: Database["public"]["Enums"]["building_t"] }

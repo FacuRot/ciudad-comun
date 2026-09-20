@@ -3,7 +3,17 @@ import { sb } from './client';
 import { codeOf, GameError } from './errors';
 import { refreshMe } from './sync';
 import { useCity } from '../store/city';
-import type { BuildingType, Construction, GameEvent, JoinMap, Lot, Material, PublicWork } from '../types/game';
+import type {
+  BuildingType,
+  Construction,
+  GameEvent,
+  JoinMap,
+  Lot,
+  LotState,
+  Material,
+  PublicWork,
+  WorkAmounts,
+} from '../types/game';
 
 export type InvitationInfo = {
   valid: boolean;
@@ -139,4 +149,68 @@ export async function createInvitation(): Promise<string> {
   const { data, error } = await sb.rpc('create_invitation');
   if (error) throw new GameError(codeOf(error));
   return data as string;
+}
+
+// ---------------------------------------------------------------------
+// Administración (docs/07-pantallas-y-flujos.md §3). Todas exigen players.is_admin.
+// ---------------------------------------------------------------------
+
+export type CityStats = {
+  players: number;
+  active_today: number;
+  lots_free: number;
+  lots_by_state: Record<LotState, number> | null;
+  constructions_active: number;
+  works: { name: string; status: string; cost: WorkAmounts; progress: WorkAmounts }[] | null;
+  pending_notifications: number;
+  new_players_24h: string[] | null;
+};
+
+export async function adminCityStats(): Promise<CityStats> {
+  const { data, error } = await sb.rpc('admin_city_stats');
+  if (error) throw new GameError(codeOf(error));
+  return data as unknown as CityStats;
+}
+
+export async function adminForceOpenBarrio(barrioId: string): Promise<void> {
+  const { error } = await sb.rpc('admin_force_open_barrio', { p_barrio_id: barrioId });
+  if (error) throw new GameError(codeOf(error));
+}
+
+export type PendingNotification = {
+  id: number;
+  type: string;
+  payload: Record<string, unknown>;
+  created_at: string;
+  player_id: string;
+  display_name: string;
+};
+
+// Lo que el Mago de Oz todavía no mandó: el equipo avisa a mano y marca.
+export async function adminPendingNotifications(limit?: number): Promise<PendingNotification[]> {
+  const { data, error } = await sb.rpc('admin_pending_notifications', { p_limit: limit });
+  if (error) throw new GameError(codeOf(error));
+  return (data as unknown as PendingNotification[]) ?? [];
+}
+
+// Devuelve cuántos marcó: los que ya estaban enviados no cuentan.
+export async function adminMarkNotified(ids: number[]): Promise<number> {
+  const { data, error } = await sb.rpc('admin_mark_notified', { p_ids: ids });
+  if (error) throw new GameError(codeOf(error));
+  return (data as number) ?? 0;
+}
+
+export type AdminInvitation = {
+  token: string;
+  created_at: string;
+  expires_at: string;
+  expired: boolean;
+  inviter: string | null;
+  lot_hint_name: string | null;
+};
+
+export async function adminInvitations(): Promise<AdminInvitation[]> {
+  const { data, error } = await sb.rpc('admin_invitations');
+  if (error) throw new GameError(codeOf(error));
+  return (data as unknown as AdminInvitation[]) ?? [];
 }

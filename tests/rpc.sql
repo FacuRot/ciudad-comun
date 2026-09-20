@@ -283,8 +283,25 @@ select pg_temp.ok((select fx_effective_rate(l) = 2.53 from lots l where x = 0 an
 select pg_temp.as_user('11111111-1111-1111-1111-111111111111');
 select pg_temp.err($$select admin_city_stats()$$, 'NOT_ADMIN');
 select pg_temp.err($$select admin_force_open_barrio(gen_random_uuid())$$, 'NOT_ADMIN');
+select pg_temp.err($$select admin_pending_notifications()$$, 'NOT_ADMIN');
+select pg_temp.err($$select admin_mark_notified(array[1]::bigint[])$$, 'NOT_ADMIN');
+select pg_temp.err($$select admin_invitations()$$, 'NOT_ADMIN');
 update players set is_admin = true where id = '11111111-1111-1111-1111-111111111111';
 select pg_temp.ok((admin_city_stats())->>'players' = '3', 'admin_city_stats');
+
+-- Outbox e invitaciones: el admin las ve por función porque no tienen lectura bajo RLS.
+select pg_temp.ok(jsonb_array_length(admin_pending_notifications())
+                  = (select count(*) from notifications_outbox where sent_at is null),
+                  'admin_pending_notifications trae todo lo pendiente');
+select pg_temp.ok((admin_pending_notifications(1))->0->>'display_name' is not null,
+                  'admin_pending_notifications nombra al destinatario y respeta el límite');
+select set_config('test.aviso', (admin_pending_notifications(1))->0->>'id', true);
+select pg_temp.ok(admin_mark_notified(array[current_setting('test.aviso')::bigint]) = 1, 'admin_mark_notified marca el aviso');
+select pg_temp.ok(admin_mark_notified(array[current_setting('test.aviso')::bigint]) = 0, 'admin_mark_notified es idempotente');
+select pg_temp.ok((select sent_at is not null from notifications_outbox where id = current_setting('test.aviso')::bigint),
+                  'el aviso marcado queda con sent_at');
+select pg_temp.ok(jsonb_array_length(admin_invitations()) = (select count(*) from invitations where used_by is null),
+                  'admin_invitations lista las que quedan sin usar');
 -- En sentencias separadas: invitation_info es STABLE y no ve lo insertado en la misma sentencia.
 select set_config('test.token', create_invitation(), true);
 select pg_temp.ok((invitation_info(current_setting('test.token')))->>'inviter' = 'Facu', 'create_invitation + invitation_info');

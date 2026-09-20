@@ -36,6 +36,8 @@ Toda acción del jugador es una llamada `supabase.rpc('<función>', {...})`. Las
 | `NOT_ADMIN` | Sin permisos | — |
 | violación de PK en `construction_helps` | Ya ayudó esa construcción | "Ya ayudaste en esta obra." |
 
+El cliente (`web/src/api/errors.ts`) agrega tres códigos que ninguna función lanza: `OFFLINE` ("Se cortó la conexión. Probá de nuevo cuando vuelva.") cuando el pedido no llega, `UNKNOWN` para cualquier otra cosa, y los nombres de restricción de la base (`ALREADY_HELPED`, `LOT_NAME_TAKEN`, `DISPLAY_NAME_TAKEN`, `NAME_LENGTH`). Un 401 de PostgREST (`PGRST301` y compañía) se traduce a `NO_AUTH`: la sesión venció.
+
 ## Acciones
 
 ### `invitation_info(p_token)` → jsonb

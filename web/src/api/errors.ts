@@ -31,6 +31,8 @@ const MESSAGES: Record<string, string> = {
   LOT_NAME_TAKEN: 'Ese nombre ya lo usa otro lote.',
   DISPLAY_NAME_TAKEN: 'Ese apodo ya lo usa otra persona.',
   NAME_LENGTH: 'Tiene que tener entre 2 y 24 caracteres.',
+  // Propios del cliente: no los lanza ninguna función.
+  OFFLINE: 'Se cortó la conexión. Probá de nuevo cuando vuelva.',
   UNKNOWN: 'Algo salió mal. Probá de nuevo en un rato.',
 };
 
@@ -52,12 +54,19 @@ export class GameError extends Error {
 
 type PgError = { message?: string; code?: string };
 
+// La sesión venció o el token no sirve: PostgREST responde 401 con estos códigos.
+const AUTH_CODES = ['PGRST301', 'PGRST302', 'PGRST303'];
+
 export function codeOf(error: PgError): string {
   const message = error.message ?? '';
   if (message in MESSAGES) return message;
   for (const [constraint, code] of Object.entries(CONSTRAINTS)) {
     if (message.includes(`"${constraint}"`)) return code;
   }
+  if (error.code && AUTH_CODES.includes(error.code)) return 'NO_AUTH';
+  if (/\bjwt\b/i.test(message)) return 'NO_AUTH';
+  // supabase-js devuelve el error de fetch tal cual cuando no hay red.
+  if (/failed to fetch|networkerror|network request failed/i.test(message)) return 'OFFLINE';
   return 'UNKNOWN';
 }
 

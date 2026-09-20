@@ -204,6 +204,15 @@ function FoundCard(props: {
       }
     } catch (err) {
       const code = err instanceof GameError ? err.code : 'UNKNOWN';
+      // Ya tenía lote (otra pestaña, o volvió al link viejo): el lugar es la ciudad (docs/06).
+      if (code === 'ALREADY_PLAYER') {
+        if (uid) {
+          const { me, inventory } = await loadMe(uid);
+          setMe(me, inventory);
+        }
+        navigate('/city', true);
+        return;
+      }
       if (code === 'LOT_NOT_FREE' || code === 'LOT_ISOLATED') {
         onLost(messageOf(err));
         return;

@@ -61,12 +61,6 @@ const ACCENT = '#2b8a80';
 const WORKING = '#e8910c';
 const FOLIAGE = ['#6f9440', '#83a84e', '#5d8237'];
 const TRUNK = '#8a6a45';
-// Lado del edificio respecto del tile, por nivel (0 = sin edificio).
-const BUILDING_SIZE = [0, 0.38, 0.5, 0.62];
-// Dónde se apoya el edificio dentro del lote: deja aire abajo para la sombra y el pasto.
-const BASE = 0.78;
-// Dónde arranca el cuerpo dentro de la caja del edificio: de ahí cuelgan las ventanas de noche.
-const BODY_TOP: Record<BuildingType, number> = { ladrilleria: 0.26, aserradero: 0.44, generador: 0.34, plaza: 0.5 };
 
 function roundRect(
   ctx: CanvasRenderingContext2D,
@@ -487,10 +481,33 @@ function drawLot(ctx: CanvasRenderingContext2D, lot: Lot, px: number, py: number
   ctx.restore();
 }
 
-// Caja donde entra el edificio: crece con el nivel y se apoya siempre a la misma altura.
-function buildingBox(level: number, px: number, py: number, t: number) {
-  const s = t * BUILDING_SIZE[level];
-  return { x: px + (t - s) / 2, y: py + t * BASE - s, s };
+// --- Edificios ---------------------------------------------------------
+// Cada oficio es un edificio, no un objeto: paredes, techo, puerta y ventanas.
+// Lo que cambia entre uno y otro es la silueta y los detalles del oficio.
+type Facade = { x: number; y: number; w: number; h: number };
+
+// Huella del frente: el ancho lo fija el oficio y el alto crece con el nivel.
+const FOOTPRINT: Record<BuildingType, { w: number; base: number; step: number }> = {
+  ladrilleria: { w: 0.74, base: 0.26, step: 0.07 }, // fábrica ancha
+  aserradero: { w: 0.64, base: 0.22, step: 0.07 }, // galpón
+  generador: { w: 0.54, base: 0.28, step: 0.09 }, // usina angosta y alta
+  plaza: { w: 0.7, base: 0, step: 0 },
+};
+// Altura del lote donde se apoyan todos los edificios: los alinea entre vecinos.
+const GROUND = 0.8;
+
+function facadeOf(type: BuildingType, level: number, px: number, py: number, t: number): Facade {
+  const { w: fw, base, step } = FOOTPRINT[type];
+  const w = t * fw;
+  const h = t * (base + step * level);
+  return { x: px + (t - w) / 2, y: py + t * GROUND - h, w, h };
+}
+
+// Ventanas del frente: una por nivel, en la banda de arriba. De noche se repintan encendidas.
+function windowsOf(level: number, f: Facade): { x: number; y: number; s: number }[] {
+  const s = Math.min(f.h * 0.24, f.w * 0.16);
+  const y = f.y + f.h * 0.2;
+  return Array.from({ length: level }, (_, i) => ({ x: f.x + (f.w * (i + 1)) / (level + 1) - s / 2, y, s }));
 }
 
 function drawBuilding(
@@ -510,157 +527,261 @@ function drawBuilding(
     return;
   }
 
-  const { x, y, s } = buildingBox(level, px, py, t);
+  const f = facadeOf(type, level, px, py, t);
   // Sombra en el piso: apoya el edificio sobre el lote.
   ctx.fillStyle = 'rgba(38, 32, 24, 0.16)';
   ctx.beginPath();
-  ctx.ellipse(x + s / 2, y + s * 1.01, s * 0.56, s * 0.1, 0, 0, Math.PI * 2);
+  ctx.ellipse(px + t / 2, f.y + f.h, f.w * 0.58, t * 0.035, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  if (type === 'ladrilleria') drawLadrilleria(ctx, x, y, s, color, activo, now, seed);
-  if (type === 'aserradero') drawAserradero(ctx, x, y, s, color);
-  if (type === 'generador') drawGenerador(ctx, x, y, s, color);
+  if (type === 'ladrilleria') drawLadrilleria(ctx, f, py, t, color, activo, now, seed);
+  if (type === 'aserradero') drawAserradero(ctx, f, t, color);
+  if (type === 'generador') drawGenerador(ctx, f, t, color);
+
+  drawPlinth(ctx, f, t, color);
+  drawDoor(ctx, f, t, color, type === 'aserradero');
+  drawWindows(ctx, level, f, color);
 }
 
-// Cuerpo común: un poco de luz arriba y sombra abajo, con las esquinas redondeadas.
-function body(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, color: string, r: number) {
-  const g = ctx.createLinearGradient(0, y, 0, y + h);
-  g.addColorStop(0, lighten(color, 0.14));
-  g.addColorStop(1, darken(color, 0.12));
+// Paredes: un poco de luz arriba y sombra abajo, con las esquinas apenas redondeadas.
+function walls(ctx: CanvasRenderingContext2D, f: Facade, color: string, r: number) {
+  const g = ctx.createLinearGradient(0, f.y, 0, f.y + f.h);
+  g.addColorStop(0, lighten(color, 0.16));
+  g.addColorStop(1, darken(color, 0.1));
   ctx.fillStyle = g;
-  roundRect(ctx, x, y, w, h, r);
+  roundRect(ctx, f.x, f.y, f.w, f.h, [r, r, r * 0.4, r * 0.4]);
   ctx.fill();
 }
 
-// Ladrillería: horno con chimenea humeante y unas hiladas de ladrillo.
+// Zócalo: una faja oscura al pie, para que el edificio no flote.
+function drawPlinth(ctx: CanvasRenderingContext2D, f: Facade, t: number, color: string) {
+  const h = Math.max(1.5, t * 0.022);
+  ctx.fillStyle = darken(color, 0.26);
+  ctx.fillRect(f.x, f.y + f.h - h, f.w, h);
+}
+
+function drawDoor(ctx: CanvasRenderingContext2D, f: Facade, t: number, color: string, porton: boolean) {
+  const w = f.w * (porton ? 0.34 : 0.22);
+  const h = f.h * (porton ? 0.46 : 0.4);
+  const x = f.x + (f.w - w) / 2;
+  const y = f.y + f.h - h;
+  ctx.fillStyle = darken(color, 0.4);
+  roundRect(ctx, x, y, w, h, [w * (porton ? 0.5 : 0.24), w * (porton ? 0.5 : 0.24), 0, 0]);
+  ctx.fill();
+  if (porton) {
+    // Las dos tablas cruzadas del portón del galpón.
+    ctx.save();
+    roundRect(ctx, x, y, w, h, [w * 0.5, w * 0.5, 0, 0]);
+    ctx.clip();
+    ctx.strokeStyle = lighten(color, 0.2);
+    ctx.lineWidth = Math.max(1, t * 0.014);
+    ctx.beginPath();
+    ctx.moveTo(x, y + h * 0.35);
+    ctx.lineTo(x + w, y + h);
+    ctx.moveTo(x + w, y + h * 0.35);
+    ctx.lineTo(x, y + h);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+function drawWindows(ctx: CanvasRenderingContext2D, level: number, f: Facade, color: string) {
+  for (const { x, y, s } of windowsOf(level, f)) {
+    ctx.fillStyle = darken(color, 0.44);
+    roundRect(ctx, x, y, s, s, s * 0.2);
+    ctx.fill();
+    // Un reflejo arriba: alcanza para que se lea vidrio y no un agujero.
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.22)';
+    roundRect(ctx, x, y, s, s * 0.44, [s * 0.2, s * 0.2, 0, 0]);
+    ctx.fill();
+  }
+}
+
+// Ladrillería: fábrica ancha de ladrillo a la vista, techo en diente de sierra
+// y una chimenea que humea mientras el lote está activo.
 function drawLadrilleria(
   ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  s: number,
+  f: Facade,
+  py: number,
+  t: number,
   color: string,
   activo: boolean,
   now: number,
   seed: string,
 ) {
-  const top = y + s * BODY_TOP.ladrilleria;
-  const h = y + s - top;
-  body(ctx, x, top, s, h, color, s * 0.12);
+  const roof = darken(color, 0.34);
+  const chw = t * 0.1;
+  const chx = f.x + (hash01(seed) < 0.5 ? f.w * 0.08 : f.w * 0.8);
+  // La chimenea arranca siempre a la misma altura: así el humo tiene lugar en todos los niveles.
+  const chTop = py + t * 0.16;
+
+  ctx.fillStyle = roof;
+  roundRect(ctx, chx, chTop, chw, f.y + f.h * 0.5 - chTop, [chw * 0.3, chw * 0.3, 0, 0]);
+  ctx.fill();
+  ctx.fillStyle = lighten(color, 0.28);
+  roundRect(ctx, chx - chw * 0.16, chTop, chw * 1.32, chw * 0.34, chw * 0.15);
+  ctx.fill();
+
+  // Techo en diente de sierra: tres dientes, la silueta que dice "fábrica".
+  const th = t * 0.075;
+  const tw = f.w / 3;
+  ctx.save();
+  ctx.fillStyle = roof;
+  ctx.strokeStyle = roof;
+  ctx.lineWidth = t * 0.022;
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(f.x, f.y);
+  for (let i = 0; i < 3; i++) {
+    ctx.lineTo(f.x + i * tw, f.y - th);
+    ctx.lineTo(f.x + (i + 1) * tw, f.y);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+
+  walls(ctx, f, color, t * 0.03);
 
   // Hiladas de ladrillo, trabadas una fila sí y otra no.
   ctx.save();
-  roundRect(ctx, x, top, s, h, s * 0.12);
+  roundRect(ctx, f.x, f.y, f.w, f.h, t * 0.03);
   ctx.clip();
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.22)';
-  ctx.lineWidth = Math.max(0.8, s * 0.02);
-  const rows = 4;
-  for (let i = 1; i <= rows; i++) {
-    const ly = top + (h * i) / (rows + 1);
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+  ctx.lineWidth = Math.max(0.8, t * 0.012);
+  const courses = 5;
+  for (let i = 1; i <= courses; i++) {
+    const ly = f.y + (f.h * i) / courses;
     ctx.beginPath();
-    ctx.moveTo(x, ly);
-    ctx.lineTo(x + s, ly);
+    ctx.moveTo(f.x, ly);
+    ctx.lineTo(f.x + f.w, ly);
     ctx.stroke();
-    for (let j = 0; j < 3; j++) {
-      const lx = x + s * (i % 2 ? 0.17 : 0.34) + (s * j) / 3;
+    for (let j = 0; j < 4; j++) {
+      const lx = f.x + f.w * (i % 2 ? 0.12 : 0.24) + (f.w * j) / 4;
       ctx.beginPath();
       ctx.moveTo(lx, ly);
-      ctx.lineTo(lx, ly + h / (rows + 1));
+      ctx.lineTo(lx, ly - f.h / courses);
       ctx.stroke();
     }
   }
   ctx.restore();
 
-  // Techo y chimenea.
-  const chx = x + s * (hash01(seed) < 0.5 ? 0.14 : 0.68);
-  ctx.fillStyle = darken(color, 0.34);
-  roundRect(ctx, chx, y + s * 0.01, s * 0.18, s * 0.32, [s * 0.06, s * 0.06, 0, 0]);
-  ctx.fill();
-  roundRect(ctx, x - s * 0.06, top - s * 0.1, s * 1.12, s * 0.15, s * 0.07);
-  ctx.fill();
+  // Cornisa: separa la pared del techo.
+  ctx.fillStyle = roof;
+  ctx.fillRect(f.x - f.w * 0.03, f.y - t * 0.012, f.w * 1.06, t * 0.028);
 
   if (!activo) return;
   // Tres bocanadas que suben y se abren. El ciclo es largo: no distrae.
   ctx.save();
   for (let i = 0; i < 3; i++) {
     const phase = (now / 3400 + i / 3) % 1;
-    ctx.globalAlpha = 0.32 * (1 - phase);
+    ctx.globalAlpha = 0.34 * (1 - phase);
     ctx.fillStyle = '#f6f2e8';
     ctx.beginPath();
-    ctx.arc(
-      chx + s * 0.09 + s * 0.09 * phase,
-      y - s * 0.03 - s * 0.3 * phase,
-      s * (0.06 + 0.08 * phase),
-      0,
-      Math.PI * 2,
-    );
+    ctx.arc(chx + chw * 0.5 + t * 0.06 * phase, chTop - t * 0.03 - t * 0.1 * phase, t * (0.035 + 0.03 * phase), 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.restore();
 }
 
-// Aserradero: galpón de techo a dos aguas con troncos apilados al costado.
-function drawAserradero(ctx: CanvasRenderingContext2D, x: number, y: number, s: number, color: string) {
-  const top = y + s * BODY_TOP.aserradero;
-  body(ctx, x + s * 0.08, top, s * 0.84, y + s - top, color, s * 0.1);
+// Aserradero: galpón de madera con techo a dos aguas, portón y tablas verticales.
+function drawAserradero(ctx: CanvasRenderingContext2D, f: Facade, t: number, color: string) {
+  const roof = darken(color, 0.36);
+  const apex = f.y - t * 0.2;
+  const eave = f.w * 0.1; // alero
 
-  // Portón.
-  ctx.fillStyle = darken(color, 0.3);
-  roundRect(ctx, x + s * 0.36, y + s * 0.68, s * 0.3, s * 0.32, [s * 0.09, s * 0.09, 0, 0]);
-  ctx.fill();
-
-  // Techo: triángulo trazado con uniones redondeadas para que no pinche.
-  ctx.save();
-  ctx.fillStyle = darken(color, 0.36);
-  ctx.strokeStyle = darken(color, 0.36);
-  ctx.lineWidth = s * 0.1;
-  ctx.lineJoin = 'round';
+  // Frontón: la pared del triángulo, del mismo color que el resto.
+  ctx.fillStyle = lighten(color, 0.1);
   ctx.beginPath();
-  ctx.moveTo(x + s * 0.04, top + s * 0.04);
-  ctx.lineTo(x + s * 0.5, y + s * 0.11);
-  ctx.lineTo(x + s * 0.96, top + s * 0.04);
+  ctx.moveTo(f.x, f.y);
+  ctx.lineTo(f.x + f.w / 2, apex);
+  ctx.lineTo(f.x + f.w, f.y);
   ctx.closePath();
   ctx.fill();
+
+  // Las dos aguas, como fajas gruesas de punta redondeada.
+  ctx.save();
+  ctx.strokeStyle = roof;
+  ctx.lineWidth = t * 0.05;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(f.x - eave, f.y + t * 0.025);
+  ctx.lineTo(f.x + f.w / 2, apex);
+  ctx.lineTo(f.x + f.w + eave, f.y + t * 0.025);
   ctx.stroke();
   ctx.restore();
 
-  // Troncos apilados: dos abajo y uno arriba.
-  const lr = s * 0.1;
-  for (const [dx, dy] of [
-    [0.03, 0.9],
-    [0.21, 0.9],
-    [0.12, 0.73],
+  // Óculo del frontón, por donde se sube la madera.
+  ctx.fillStyle = darken(color, 0.42);
+  ctx.beginPath();
+  ctx.arc(f.x + f.w / 2, apex + t * 0.088, t * 0.032, 0, Math.PI * 2);
+  ctx.fill();
+
+  walls(ctx, f, color, t * 0.025);
+
+  // Tablas verticales.
+  ctx.save();
+  roundRect(ctx, f.x, f.y, f.w, f.h, t * 0.025);
+  ctx.clip();
+  ctx.strokeStyle = 'rgba(38, 32, 24, 0.14)';
+  ctx.lineWidth = Math.max(0.8, t * 0.012);
+  for (let i = 1; i < 7; i++) {
+    const lx = f.x + (f.w * i) / 7;
+    ctx.beginPath();
+    ctx.moveTo(lx, f.y);
+    ctx.lineTo(lx, f.y + f.h);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // Troncos apilados contra la pared: el oficio, al costado del edificio.
+  const lr = t * 0.038;
+  const base = f.y + f.h;
+  for (const [cx, cy] of [
+    [f.x + f.w + lr * 0.4, base - lr],
+    [f.x + f.w + lr * 2.2, base - lr],
+    [f.x + f.w + lr * 1.3, base - lr * 2.7],
   ]) {
     ctx.fillStyle = TRUNK;
     ctx.beginPath();
-    ctx.arc(x + s * dx, y + s * dy, lr, 0, Math.PI * 2);
+    ctx.arc(cx, cy, lr, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillStyle = lighten(TRUNK, 0.38);
     ctx.beginPath();
-    ctx.arc(x + s * dx, y + s * dy, lr * 0.44, 0, Math.PI * 2);
+    ctx.arc(cx, cy, lr * 0.44, 0, Math.PI * 2);
     ctx.fill();
   }
 }
 
-// Generador: nave baja con un rayo pintado y una torre al costado.
-function drawGenerador(ctx: CanvasRenderingContext2D, x: number, y: number, s: number, color: string) {
-  ctx.fillStyle = darken(color, 0.3);
-  roundRect(ctx, x + s * 0.7, y, s * 0.2, s * 0.62, [s * 0.09, s * 0.09, 0, 0]);
-  ctx.fill();
-  ctx.fillStyle = lighten(color, 0.3);
-  roundRect(ctx, x + s * 0.66, y + s * 0.05, s * 0.28, s * 0.08, s * 0.04);
+// Generador: usina angosta con losa, dos chimeneas cortas y el cartel del rayo.
+function drawGenerador(ctx: CanvasRenderingContext2D, f: Facade, t: number, color: string) {
+  const roof = darken(color, 0.34);
+
+  for (const dx of [0.2, 0.62]) {
+    ctx.fillStyle = roof;
+    roundRect(ctx, f.x + f.w * dx, f.y - t * 0.095, f.w * 0.18, t * 0.12, [f.w * 0.06, f.w * 0.06, 0, 0]);
+    ctx.fill();
+    ctx.fillStyle = lighten(color, 0.28);
+    roundRect(ctx, f.x + f.w * dx - f.w * 0.03, f.y - t * 0.095, f.w * 0.24, t * 0.028, t * 0.012);
+    ctx.fill();
+  }
+
+  walls(ctx, f, color, t * 0.03);
+
+  // Parapeto de la losa.
+  ctx.fillStyle = roof;
+  roundRect(ctx, f.x - f.w * 0.05, f.y - t * 0.022, f.w * 1.1, t * 0.05, t * 0.02);
   ctx.fill();
 
-  const top = y + s * BODY_TOP.generador;
-  body(ctx, x + s * 0.04, top, s * 0.78, y + s - top, color, s * 0.12);
-  ctx.fillStyle = darken(color, 0.34);
-  roundRect(ctx, x, top - s * 0.09, s * 0.86, s * 0.13, s * 0.06);
+  // Cartel redondo con el rayo, montado sobre el parapeto.
+  const r = t * 0.058;
+  const cx = f.x + f.w / 2;
+  const cy = f.y - t * 0.022 - r * 0.7;
+  ctx.fillStyle = roof;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
   ctx.fill();
-
-  // Rayo.
-  const bx = x + s * 0.18;
-  const by = y + s * 0.52;
-  const bw = s * 0.36;
-  const bh = s * 0.38;
   const bolt: [number, number][] = [
     [0.6, 0],
     [0.12, 0.56],
@@ -672,19 +793,21 @@ function drawGenerador(ctx: CanvasRenderingContext2D, x: number, y: number, s: n
   ctx.save();
   ctx.fillStyle = '#ffd257';
   ctx.strokeStyle = '#ffd257';
-  ctx.lineWidth = s * 0.05;
+  ctx.lineWidth = r * 0.18;
   ctx.lineJoin = 'round';
   ctx.beginPath();
-  bolt.forEach(([fx, fy], i) =>
-    i === 0 ? ctx.moveTo(bx + bw * fx, by + bh * fy) : ctx.lineTo(bx + bw * fx, by + bh * fy),
-  );
+  bolt.forEach(([bx, by], i) => {
+    const x = cx - r * 0.62 + r * 1.24 * bx;
+    const y = cy - r * 0.68 + r * 1.36 * by;
+    return i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  });
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
   ctx.restore();
 }
 
-// Plaza: cantero con un camino y tantos árboles como nivel tiene.
+// Plaza: el lote no se edifica. Cantero con camino, un kiosco en el medio y un árbol por nivel.
 function drawPlaza(ctx: CanvasRenderingContext2D, level: number, px: number, py: number, t: number, color: string) {
   ctx.fillStyle = mix('#93b45c', color, 0.2);
   roundRect(ctx, px + t * 0.15, py + t * 0.2, t * 0.7, t * 0.62, t * 0.26);
@@ -692,28 +815,63 @@ function drawPlaza(ctx: CanvasRenderingContext2D, level: number, px: number, py:
 
   // Camino que la cruza.
   ctx.fillStyle = 'rgba(243, 236, 218, 0.8)';
-  roundRect(ctx, px + t * 0.15, py + t * 0.63, t * 0.7, t * 0.1, t * 0.05);
+  roundRect(ctx, px + t * 0.15, py + t * 0.67, t * 0.7, t * 0.1, t * 0.05);
   ctx.fill();
 
   const arboles: [number, number, number][] = [
-    [0.37, 0.61, 0.28],
-    [0.65, 0.55, 0.22],
-    [0.5, 0.79, 0.19],
+    [0.27, 0.62, 0.24],
+    [0.74, 0.6, 0.21],
+    [0.6, 0.79, 0.18],
   ];
   for (let i = 0; i < Math.min(level, 3); i++) {
     const [fx, fy, size] = arboles[i];
     drawTree(ctx, px + t * fx, py + t * fy, t * size);
   }
 
-  if (level >= 3) {
-    // Banquito al costado del camino.
-    ctx.fillStyle = TRUNK;
-    roundRect(ctx, px + t * 0.62, py + t * 0.75, t * 0.17, t * 0.045, t * 0.02);
-    ctx.fill();
-  }
+  drawKiosco(ctx, px + t * 0.5, py + t * 0.64, t * (0.26 + level * 0.03), darken(color, 0.34));
 }
 
-// De noche: ventanas encendidas, o faroles si el lote es una plaza.
+// Kiosco de la plaza: tarima, cuatro columnas y un techo que vuela por encima.
+// Sin baranda: con baranda se lee como una cerca y no como una construcción.
+function drawKiosco(ctx: CanvasRenderingContext2D, cx: number, baseY: number, w: number, roof: string) {
+  const h = w * 0.42; // alto de las columnas
+  ctx.fillStyle = 'rgba(38, 32, 24, 0.14)';
+  ctx.beginPath();
+  ctx.ellipse(cx, baseY, w * 0.56, w * 0.1, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Tarima.
+  ctx.fillStyle = '#ece2cb';
+  roundRect(ctx, cx - w * 0.46, baseY - w * 0.1, w * 0.92, w * 0.14, w * 0.05);
+  ctx.fill();
+
+  ctx.fillStyle = '#f8f2e3';
+  for (const dx of [-0.34, -0.13, 0.13, 0.34]) {
+    ctx.fillRect(cx + w * dx - w * 0.05, baseY - h, w * 0.1, h);
+  }
+
+  // Techo: el alero vuela más ancho que las columnas, que es lo que lo hace kiosco.
+  ctx.save();
+  ctx.fillStyle = roof;
+  ctx.strokeStyle = roof;
+  ctx.lineWidth = w * 0.13;
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  // Más bajo y más ancho que el techo del aserradero: a lo lejos no se confunden.
+  ctx.beginPath();
+  ctx.moveTo(cx - w * 0.68, baseY - h);
+  ctx.lineTo(cx, baseY - h - w * 0.3);
+  ctx.lineTo(cx + w * 0.68, baseY - h);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(cx, baseY - h - w * 0.4, w * 0.07, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+// De noche: las mismas ventanas encendidas, o faroles si el lote es una plaza.
 function drawNightLights(
   ctx: CanvasRenderingContext2D,
   type: BuildingType,
@@ -729,9 +887,9 @@ function drawNightLights(
 
   if (type === 'plaza') {
     const faroles: [number, number][] = [
-      [0.24, 0.55],
-      [0.78, 0.55],
-      [0.5, 0.3],
+      [0.23, 0.52],
+      [0.79, 0.5],
+      [0.5, 0.5],
     ];
     for (let i = 0; i < Math.min(level, 3); i++) {
       ctx.beginPath();
@@ -742,11 +900,9 @@ function drawNightLights(
     return;
   }
 
-  const { x, y, s } = buildingBox(level, px, py, t);
-  const top = y + s * BODY_TOP[type];
-  const w = Math.max(2, s * 0.14);
-  for (let i = 0; i < level; i++) {
-    ctx.fillRect(x + (s * (i + 1)) / (level + 1) - w / 2, top + s * 0.15, w, w);
+  for (const { x, y, s } of windowsOf(level, facadeOf(type, level, px, py, t))) {
+    roundRect(ctx, x, y, s, s, s * 0.2);
+    ctx.fill();
   }
   ctx.restore();
 }

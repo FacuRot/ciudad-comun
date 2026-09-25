@@ -9,7 +9,9 @@ import { workPercent, type Cell } from '../game/geo';
 import { formatRemaining } from '../game/format';
 import type { Layout } from './layout';
 import { ABANDONED, darken, desaturate, lighten, lotColor, mix } from './colors';
+import { CURB, streetsOf, ZEBRA } from './streets';
 import { phaseAt, type Phase } from './time';
+import type { Traffic } from './traffic';
 
 export type LotMark = 'claimable' | 'suggested' | 'blocked';
 
@@ -26,6 +28,7 @@ export type Scene = {
   selectedWorkId?: string | null;
   marks?: Map<string, LotMark>; // pantalla de entrada: qué lotes libres se pueden tomar
   hovered?: Cell | null;
+  traffic?: Traffic; // autos y gente de adorno: los mueve CityCanvas en cada cuadro
 };
 
 type Theme = {
@@ -137,7 +140,7 @@ export function drawScene(ctx: CanvasRenderingContext2D, layout: Layout, scene: 
   ctx.fill();
   ctx.restore();
 
-  drawStreets(ctx, layout, scene, theme);
+  const trees = drawStreets(ctx, layout, scene, theme);
 
   // Capa de suelo: solo lo que es terreno. Va antes que todos los volúmenes para
   // que ninguna marca de lote le pise el pie al edificio del vecino.
@@ -149,6 +152,19 @@ export function drawScene(ctx: CanvasRenderingContext2D, layout: Layout, scene: 
     const { px, py } = at(work);
     drawWorkPlate(ctx, work, px, py, t);
   }
+
+  // Tránsito y arbolitos, recortados al tablero: así se entra y se sale por el borde.
+  // Los autos van al ras del piso; la gente se ordena con los árboles de atrás hacia
+  // adelante, para pasar por detrás de las copas.
+  ctx.save();
+  roundRect(ctx, ox, oy, cols * t, rows * t, t * 0.22);
+  ctx.clip();
+  scene.traffic?.drawCars(ctx, layout);
+  const standing = trees.map(({ cx, baseY, size }) => ({ y: baseY, paint: () => drawTree(ctx, cx, baseY, size) }));
+  standing.push(...(scene.traffic?.walkers(ctx, layout) ?? []));
+  standing.sort((a, b) => a.y - b.y);
+  for (const s of standing) s.paint();
+  ctx.restore();
 
   // Capa de volumen, de atrás hacia adelante: lo que está más abajo en el mapa
   // está más cerca, así que se dibuja después y tapa lo de arriba.
@@ -184,6 +200,13 @@ export function drawScene(ctx: CanvasRenderingContext2D, layout: Layout, scene: 
         const { px, py } = at(lot);
         drawNightLights(ctx, lot.building_type, lot.level, px, py, t);
       }
+    }
+    if (scene.traffic) {
+      ctx.save();
+      roundRect(ctx, ox, oy, cols * t, rows * t, t * 0.22);
+      ctx.clip();
+      scene.traffic.drawHeadlights(ctx, layout);
+      ctx.restore();
     }
   }
 
@@ -261,21 +284,16 @@ function lotShade(lot: Lot): string {
 // Toda celda que no es lote ni obra es calle. Cada una se dibuja como vereda entera
 // más una calzada que se estira hacia las celdas de calle vecinas: así las cuadras
 // se encadenan en avenidas continuas en vez de quedar como cuadrados sueltos.
-function drawStreets(ctx: CanvasRenderingContext2D, layout: Layout, scene: Scene, theme: Theme) {
+// Devuelve dónde van los arbolitos: se dibujan después, mezclados con la gente que camina.
+function drawStreets(ctx: CanvasRenderingContext2D, layout: Layout, scene: Scene, theme: Theme): StreetTree[] {
   const { tile: t, ox, oy, cols, rows } = layout;
-  const built = new Set([...scene.lots, ...scene.works].map((c) => `${c.x},${c.y}`));
-  // Fuera de la grilla la calle sigue: así las avenidas salen del tablero en vez de cortarse.
-  const isStreet = (x: number, y: number) => x < 0 || y < 0 || x >= cols || y >= rows || !built.has(`${x},${y}`);
-  const inside = (x: number, y: number) => x >= 0 && y >= 0 && x < cols && y < rows;
-  const isCrossing = (x: number, y: number) =>
-    isStreet(x, y) &&
-    [isStreet(x, y - 1), isStreet(x, y + 1), isStreet(x - 1, y), isStreet(x + 1, y)].filter(Boolean).length >= 3;
+  const { inside, isStreet, isCrossing } = streetsOf(cols, rows, [...scene.lots, ...scene.works]);
 
-  const curb = t * 0.17;
+  const curb = t * CURB;
   const cells: { x: number; y: number; px: number; py: number; n: boolean; s: boolean; e: boolean; w: boolean }[] = [];
   for (let y = 0; y < rows; y++) {
     for (let x = 0; x < cols; x++) {
-      if (built.has(`${x},${y}`)) continue;
+      if (!isStreet(x, y)) continue;
       cells.push({
         x,
         y,
@@ -348,6 +366,7 @@ function drawStreets(ctx: CanvasRenderingContext2D, layout: Layout, scene: Scene
   }
 
   // Arbolitos en la vereda: el sorteo sale del lugar, así que son siempre los mismos.
+  const trees: StreetTree[] = [];
   if (t >= 26) {
     for (const c of cells) {
       if (isCrossing(c.x, c.y)) continue;
@@ -359,11 +378,14 @@ function drawStreets(ctx: CanvasRenderingContext2D, layout: Layout, scene: Scene
         const mid = curb / 2;
         const cx = side === 'n' || side === 's' ? c.px + t * along : c.px + (side === 'w' ? mid : t - mid);
         const cy = side === 'e' || side === 'w' ? c.py + t * along : c.py + (side === 'n' ? mid : t - mid);
-        drawTree(ctx, cx, cy + curb * 0.4, t * 0.19);
+        trees.push({ cx, baseY: cy + curb * 0.4, size: t * 0.19 });
       }
     }
   }
+  return trees;
 }
+
+type StreetTree = { cx: number; baseY: number; size: number };
 
 // Senda peatonal: cuatro bastones cruzados a la calzada, junto al borde que da al cruce.
 function zebra(
@@ -374,11 +396,11 @@ function zebra(
   curb: number,
   side: 'n' | 's' | 'e' | 'w',
 ) {
-  const bar = t * 0.04; // ancho de cada bastón
-  const step = t * 0.055; // cuánto se repiten hacia adentro
-  const edge = t * 0.03;
+  const bar = t * ZEBRA.bar; // ancho de cada bastón
+  const step = t * ZEBRA.step; // cuánto se repiten hacia adentro
+  const edge = t * ZEBRA.edge;
   const span = t - curb * 2; // la calzada, de cordón a cordón
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < ZEBRA.count; i++) {
     const d = edge + i * step;
     if (side === 'n') ctx.fillRect(px + curb, py + d, span, bar);
     if (side === 's') ctx.fillRect(px + curb, py + t - d - bar, span, bar);

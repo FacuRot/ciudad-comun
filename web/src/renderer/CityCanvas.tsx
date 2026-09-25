@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { Cell } from '../game/geo';
 import { cellAt, clampView, computeLayout, zoomAt, WHOLE_CITY, type Layout, type View } from './layout';
 import { drawScene, type Scene } from './draw';
+import { Traffic } from './traffic';
 
 type Props = {
   scene: Scene;
@@ -9,8 +10,8 @@ type Props = {
   tooltip?: (cell: Cell) => string | null;
 };
 
-// ~15 cuadros por segundo: alcanza para el pulso de los lotes sugeridos y el paso del día.
-const FRAME_MS = 66;
+// ~30 cuadros por segundo: lo justo para que los autos y la gente se muevan parejo.
+const FRAME_MS = 30;
 // Un toque que se movió más que esto fue un arrastre, no un clic.
 const DRAG_PX = 6;
 
@@ -21,6 +22,7 @@ export function CityCanvas({ scene, onCellClick, tooltip }: Props) {
   const layoutRef = useRef<Layout | null>(null);
   const viewRef = useRef<View>(WHOLE_CITY);
   const hoverRef = useRef<Cell | null>(null);
+  const trafficRef = useRef<Traffic | null>(null);
   const [hover, setHover] = useState<{ cell: Cell; px: number; py: number } | null>(null);
   const [zoomed, setZoomed] = useState(false);
 
@@ -53,7 +55,9 @@ export function CityCanvas({ scene, onCellClick, tooltip }: Props) {
       viewRef.current = clampView(viewRef.current, w, h, s.cols, s.rows);
       const layout = computeLayout(w, h, s.cols, s.rows, viewRef.current);
       layoutRef.current = layout;
-      drawScene(ctx, layout, { ...s, hovered: hoverRef.current }, Date.now());
+      const traffic = (trafficRef.current ??= new Traffic());
+      traffic.update(s, time);
+      drawScene(ctx, layout, { ...s, hovered: hoverRef.current, traffic }, Date.now());
     };
     raf = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(raf);

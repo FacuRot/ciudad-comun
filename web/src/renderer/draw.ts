@@ -1,9 +1,9 @@
 // Dibuja la ciudad entera en cada cuadro. Sin optimizaciones: son ~100 celdas.
 //
-// El suelo se mira desde arriba y lo construido se mira de frente, un poco desde
-// arriba: se ve el frente y el techo, nunca los costados. La luz viene de la
-// izquierda, así que cada edificio tira sombra hacia abajo a la derecha. El lote
-// no se pinta: el edificio se apoya directo sobre el mapa.
+// El suelo se mira desde arriba y lo construido se mira de frente con el ojo alto:
+// se ve el frente y el techo entero, nunca los costados. La luz viene de la
+// izquierda, así que el techo es lo más claro y cada edificio tira sombra sobre el
+// piso hacia la derecha. El lote no se pinta: el edificio se apoya directo sobre el mapa.
 import type { BuildingType, MapBarrio as Barrio, MapLot as Lot, MapWork as PublicWork } from '../types/game';
 import { workPercent, type Cell } from '../game/geo';
 import { formatRemaining } from '../game/format';
@@ -68,17 +68,16 @@ const FOLIAGE = ['#6f9440', '#83a84e', '#5d8237'];
 const TRUNK = '#8a6a45';
 const GLASS = '#9fc0cc';
 
-// Cuánto se ve del techo por encima del frente, en tiles.
-const ROOF = 0.1;
 // Altura del lote donde apoya el frente de todo lo que se construye.
-const GROUND = 0.84;
+const GROUND = 0.86;
 
-// Ancho del frente y alto de las paredes (base más un tramo por nivel), en tiles.
-const SHAPE: Record<BuildingType, { w: number; h: number; step: number }> = {
-  ladrilleria: { w: 0.58, h: 0.2, step: 0.07 }, // fábrica ancha y baja
-  aserradero: { w: 0.54, h: 0.16, step: 0.06 }, // galpón
-  generador: { w: 0.42, h: 0.23, step: 0.09 }, // usina angosta y alta
-  plaza: { w: 0.6, h: 0, step: 0 },
+// Planta y alto, en tiles: `w` es el ancho del frente, `d` el fondo de la planta
+// (es lo que se ve del techo) y el alto de las paredes es `h` más un tramo por nivel.
+const SHAPE: Record<BuildingType, { w: number; d: number; h: number; step: number }> = {
+  ladrilleria: { w: 0.74, d: 0.34, h: 0.15, step: 0.05 }, // fábrica ancha y baja
+  aserradero: { w: 0.62, d: 0.34, h: 0.14, step: 0.045 }, // galpón
+  generador: { w: 0.5, d: 0.28, h: 0.18, step: 0.075 }, // usina angosta y alta
+  plaza: { w: 0.6, d: 0, h: 0, step: 0 },
 };
 
 function roundRect(
@@ -478,49 +477,186 @@ function drawParcel(
 }
 
 // --- Volumen -----------------------------------------------------------
-// Se ve el frente y, por encima, el techo. (x, y) es la esquina de abajo a la
-// izquierda del frente; `d` es cuánto se ve del techo.
+// Cada edificio es una caja vista de frente con el ojo alto: la planta entera se
+// ve como techo, corrida hacia arriba tanto como mide la pared. (x, y) es la
+// esquina de abajo a la izquierda del frente, que apoya en el piso; `h` es el
+// alto de la pared y `d` el fondo de la planta, que es lo que se ve del techo.
 type Box = { x: number; y: number; w: number; h: number; d: number };
 
-// Cuánto vuela el alero a cada lado del frente.
-const eaveOf = (b: Box) => b.w * 0.05;
+// Cuánto vuela la losa por los costados del frente.
+const eaveOf = (b: Box) => Math.min(b.w, b.d) * 0.06;
+// Espesor del canto de la losa, que pisa el borde de arriba del frente.
+const fasciaOf = (b: Box) => Math.max(1.5, Math.min(b.h * 0.12, b.w * 0.05));
 
 function boxOf(type: BuildingType, level: number, px: number, py: number, t: number): Box {
   const s = SHAPE[type];
   const w = t * s.w;
-  return { x: px + (t - w) / 2, y: py + t * GROUND, w, h: t * (s.h + s.step * level), d: t * ROOF };
+  return { x: px + (t - w) / 2, y: py + t * GROUND, w, h: t * (s.h + s.step * level), d: t * s.d };
 }
 
-// Sombra propia sobre el piso: la huella del edificio, corrida hacia donde no da la luz.
+// Lo que ata el edificio al piso: la planta estirada hacia la derecha, adonde no
+// llega la luz, y una franja oscura justo donde la pared toca el suelo.
 function castShadow(ctx: CanvasRenderingContext2D, b: Box) {
-  const off = b.h * 0.2;
-  ctx.fillStyle = 'rgba(38, 32, 24, 0.15)';
-  roundRect(ctx, b.x + off, b.y - b.d + off * 0.4, b.w, b.d * 1.3, b.d * 0.35);
+  const s = b.h * 0.55 + b.w * 0.06;
+  const sy = b.h * 0.1;
+  ctx.fillStyle = 'rgba(38, 32, 24, 0.16)';
+  poly(ctx, [
+    [b.x, b.y - b.d],
+    [b.x + b.w, b.y - b.d],
+    [b.x + b.w + s, b.y - b.d + sy],
+    [b.x + b.w + s, b.y + sy],
+    [b.x + s * 0.4, b.y + sy],
+    [b.x, b.y],
+  ]);
   ctx.fill();
+
+  const ao = Math.max(2, b.h * 0.14);
+  const g = ctx.createLinearGradient(0, b.y, 0, b.y + ao);
+  g.addColorStop(0, 'rgba(38, 32, 24, 0.3)');
+  g.addColorStop(1, 'rgba(38, 32, 24, 0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(b.x - ao * 0.4, b.y, b.w + ao * 0.8, ao);
 }
 
-// Frente y techo plano. `roof` en null deja el techo para después (los de dos aguas).
-function volume(ctx: CanvasRenderingContext2D, b: Box, t: number, color: string, roof: string | null) {
-  ctx.save();
+function inkOf(ctx: CanvasRenderingContext2D, t: number, color: string) {
   ctx.lineJoin = 'round';
   ctx.lineCap = 'round';
   ctx.lineWidth = Math.max(1, t * 0.016);
   ctx.strokeStyle = darken(color, 0.46);
+}
 
-  if (roof) {
+// El frente: más apagado que el techo, que es lo que más luz recibe.
+function frontFill(ctx: CanvasRenderingContext2D, b: Box, color: string) {
+  const g = ctx.createLinearGradient(0, b.y - b.h, 0, b.y);
+  g.addColorStop(0, lighten(color, 0.1));
+  g.addColorStop(1, darken(color, 0.04));
+  return g;
+}
+
+// Paredes y, si `flat`, losa plana con parapeto. Los techos a dos aguas los pone quien llama.
+function volume(ctx: CanvasRenderingContext2D, b: Box, t: number, color: string, flat: boolean) {
+  ctx.save();
+  inkOf(ctx, t, color);
+
+  ctx.fillStyle = frontFill(ctx, b, color);
+  ctx.beginPath();
+  ctx.rect(b.x, b.y - b.h, b.w, b.h);
+  ctx.fill();
+  ctx.stroke();
+
+  if (flat) {
     const ov = eaveOf(b);
-    ctx.fillStyle = roof;
-    roundRect(ctx, b.x - ov, b.y - b.h - b.d, b.w + ov * 2, b.d, [b.d * 0.4, b.d * 0.4, 0, 0]);
+    const f = fasciaOf(b);
+    const x = b.x - ov;
+    const w = b.w + ov * 2;
+    const top = b.y - b.h - b.d;
+
+    // Sombra del alero sobre la pared.
+    ctx.fillStyle = 'rgba(38, 32, 24, 0.16)';
+    ctx.fillRect(b.x, b.y - b.h + f, b.w, f * 0.8);
+
+    // Tapa: el borde es el parapeto, y adentro la losa hundida.
+    ctx.fillStyle = lighten(color, 0.5);
+    ctx.beginPath();
+    ctx.rect(x, top, w, b.d);
+    ctx.fill();
+    ctx.stroke();
+    const p = Math.min(w, b.d) * 0.1;
+    ctx.fillStyle = lighten(color, 0.26);
+    ctx.fillRect(x + p, top + p, w - p * 2, b.d - p * 2);
+    // El parapeto de atrás y el de la izquierda hacen sombra sobre la losa.
+    ctx.fillStyle = 'rgba(38, 32, 24, 0.13)';
+    ctx.fillRect(x + p, top + p, w - p * 2, p * 0.7);
+    ctx.fillRect(x + p, top + p, p * 0.7, b.d - p * 2);
+
+    // Canto de la losa: el espesor que vuela por encima del frente.
+    ctx.fillStyle = lighten(color, 0.3);
+    ctx.beginPath();
+    ctx.rect(x, b.y - b.h, w, f);
     ctx.fill();
     ctx.stroke();
   }
+  ctx.restore();
+}
 
-  const g = ctx.createLinearGradient(0, b.y - b.h, 0, b.y);
-  g.addColorStop(0, lighten(color, 0.3));
-  g.addColorStop(1, lighten(color, 0.14));
-  ctx.fillStyle = g;
-  roundRect(ctx, b.x, b.y - b.h, b.w, b.h, [b.w * 0.04, b.w * 0.04, 0, 0]);
+// Techo a dos aguas con la cumbrera de adelante hacia atrás: el frontón queda en
+// el frente y se ven los dos faldones, el de la izquierda al sol y el otro a la sombra.
+function gableRoof(
+  ctx: CanvasRenderingContext2D,
+  b: Box,
+  t: number,
+  wall: CanvasFillStrokeStyles['fillStyle'],
+  roof: string,
+  ink: string,
+  rise: number,
+  over: number,
+) {
+  const top = b.y - b.h;
+  const cx = b.x + b.w / 2;
+  const drop = (over * rise) / (b.w / 2); // el alero sigue la pendiente
+  const L = b.x - over;
+  const R = b.x + b.w + over;
+
+  ctx.save();
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  ctx.lineWidth = Math.max(1, t * 0.016);
+  ctx.strokeStyle = ink;
+
+  for (const [edge, fill] of [
+    [L, lighten(roof, 0.14)],
+    [R, darken(roof, 0.16)],
+  ] as const) {
+    poly(ctx, [
+      [edge, top + drop],
+      [cx, top - rise],
+      [cx, top - rise - b.d],
+      [edge, top + drop - b.d],
+    ]);
+    ctx.fillStyle = fill;
+    ctx.fill();
+    ctx.stroke();
+    // Hileras de tejas, paralelas a la cumbrera.
+    ctx.save();
+    ctx.strokeStyle = 'rgba(38, 32, 24, 0.14)';
+    ctx.lineWidth = Math.max(0.6, t * 0.008);
+    ctx.beginPath();
+    for (const k of [0.34, 0.67]) {
+      const x = edge + (cx - edge) * k;
+      const y = top + drop + (-rise - drop) * k;
+      ctx.moveTo(x, y);
+      ctx.lineTo(x, y - b.d);
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // Cumbrera.
+  ctx.strokeStyle = lighten(roof, 0.3);
+  ctx.lineWidth = Math.max(1, t * 0.014);
+  ctx.beginPath();
+  ctx.moveTo(cx, top - rise);
+  ctx.lineTo(cx, top - rise - b.d);
+  ctx.stroke();
+
+  // Frontón: la pared triangular que sigue al frente.
+  ctx.strokeStyle = ink;
+  ctx.lineWidth = Math.max(1, t * 0.016);
+  poly(ctx, [
+    [b.x, top + 0.5],
+    [cx, top - rise],
+    [b.x + b.w, top + 0.5],
+  ]);
+  ctx.fillStyle = wall;
   ctx.fill();
+
+  // Canto del techo sobre el frontón.
+  ctx.strokeStyle = darken(roof, 0.2);
+  ctx.lineWidth = Math.max(1.5, t * 0.03);
+  ctx.beginPath();
+  ctx.moveTo(L, top + drop);
+  ctx.lineTo(cx, top - rise);
+  ctx.lineTo(R, top + drop);
   ctx.stroke();
   ctx.restore();
 }
@@ -536,50 +672,72 @@ function onFront(ctx: CanvasRenderingContext2D, b: Box, paint: () => void) {
   ctx.restore();
 }
 
-// Pinta sobre el techo plano: (u, v) desde su esquina de arriba a la izquierda.
-function onRoof(ctx: CanvasRenderingContext2D, b: Box, paint: () => void) {
+// Pinta sobre la losa, dentro del parapeto: recibe su ancho y su fondo.
+function onRoof(ctx: CanvasRenderingContext2D, b: Box, paint: (w: number, d: number) => void) {
   const ov = eaveOf(b);
+  const w = b.w + ov * 2;
+  const p = Math.min(w, b.d) * 0.1;
   ctx.save();
   ctx.beginPath();
-  ctx.rect(b.x - ov, b.y - b.h - b.d, b.w + ov * 2, b.d);
+  ctx.rect(b.x - ov + p, b.y - b.h - b.d + p, w - p * 2, b.d - p * 2);
   ctx.clip();
-  ctx.translate(b.x - ov, b.y - b.h - b.d);
-  paint();
+  ctx.translate(b.x - ov + p, b.y - b.h - b.d + p);
+  paint(w - p * 2, b.d - p * 2);
   ctx.restore();
 }
 
-// Chimenea: un prisma parado al fondo del techo, con su remate más claro.
+// Chimenea: un prisma chico parado sobre la losa. (u, v) es dónde apoya su frente,
+// en fracciones de la losa: v = 0 al fondo y 1 al borde de adelante.
 function drawStack(
   ctx: CanvasRenderingContext2D,
   b: Box,
   t: number,
   color: string,
   u: number,
+  v: number,
   w: number,
   h: number,
 ) {
-  const x = b.x + b.w * u;
-  const base = b.y - b.h - b.d * 0.65;
+  const ov = eaveOf(b);
+  const x = b.x - ov + (b.w + ov * 2) * u;
+  const base = b.y - b.h - b.d * (1 - v);
+  const d = w * 0.6;
   ctx.save();
-  ctx.lineJoin = 'round';
-  ctx.lineWidth = Math.max(1, t * 0.016);
-  ctx.strokeStyle = darken(color, 0.46);
+  inkOf(ctx, t, color);
+
+  // Su sombra sobre la losa.
+  ctx.fillStyle = 'rgba(38, 32, 24, 0.16)';
+  poly(ctx, [
+    [x + w, base - d],
+    [x + w + h * 0.4, base - d + h * 0.08],
+    [x + w + h * 0.4, base + h * 0.08],
+    [x + w * 0.5, base + h * 0.08],
+    [x, base],
+  ]);
+  ctx.fill();
+
   ctx.fillStyle = darken(color, 0.12);
-  roundRect(ctx, x, base - h, w, h, [w * 0.2, w * 0.2, 0, 0]);
+  ctx.beginPath();
+  ctx.rect(x, base - h, w, h);
   ctx.fill();
   ctx.stroke();
-  ctx.fillStyle = lighten(color, 0.22);
-  roundRect(ctx, x - w * 0.16, base - h, w * 1.32, w * 0.4, w * 0.16);
+  // Boca: la tapa clara con el hueco oscuro adentro.
+  ctx.fillStyle = lighten(color, 0.28);
+  ctx.beginPath();
+  ctx.rect(x, base - h - d, w, d);
   ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = darken(color, 0.55);
+  ctx.fillRect(x + w * 0.22, base - h - d * 0.78, w * 0.56, d * 0.56);
   ctx.restore();
-  return { cx: x + w / 2, top: base - h };
+  return { cx: x + w / 2, top: base - h - d / 2 };
 }
 
 // Ventanas del frente: una por nivel, en la banda de arriba. De noche se repintan encendidas.
 function windowsOf(level: number, b: Box): { x: number; y: number; w: number; h: number }[] {
-  const w = Math.min(b.w * 0.15, b.h * 0.26);
+  const w = Math.min(b.w * 0.14, b.h * 0.24);
   const h = w * 1.15;
-  const y = b.y - b.h + Math.min(b.h * 0.22, b.w * 0.16);
+  const y = b.y - b.h + fasciaOf(b) * 1.8 + b.h * 0.08;
   return Array.from({ length: level }, (_, i) => ({ x: b.x + (b.w * (i + 1)) / (level + 1) - w / 2, y, w, h }));
 }
 
@@ -599,8 +757,8 @@ function drawFrontWindows(ctx: CanvasRenderingContext2D, level: number, b: Box, 
 }
 
 function drawDoor(ctx: CanvasRenderingContext2D, b: Box, color: string, wide: boolean) {
-  const w = b.w * (wide ? 0.34 : 0.18);
-  const h = Math.min(b.h * 0.4, w * 1.5);
+  const w = b.w * (wide ? 0.3 : 0.16);
+  const h = Math.min(b.h * 0.42, w * 1.5);
   ctx.fillStyle = darken(color, 0.42);
   roundRect(ctx, b.x + (b.w - w) / 2, b.y - h, w, h, [w * (wide ? 0.5 : 0.22), w * (wide ? 0.5 : 0.22), 0, 0]);
   ctx.fill();
@@ -639,8 +797,8 @@ function drawBuilding(
   drawFrontWindows(ctx, level, b, color);
 }
 
-// Ladrillería: fábrica de ladrillo a la vista, techo plano con claraboyas y una
-// chimenea parada al fondo que humea mientras el lote está activo.
+// Ladrillería: fábrica de ladrillo a la vista, losa con claraboyas y una
+// chimenea alta en una esquina del fondo que humea mientras el lote está activo.
 function drawLadrilleria(
   ctx: CanvasRenderingContext2D,
   b: Box,
@@ -650,13 +808,15 @@ function drawLadrilleria(
   now: number,
   seed: string,
 ) {
-  volume(ctx, b, t, color, darken(color, 0.34));
+  volume(ctx, b, t, color, true);
 
   // Hiladas de ladrillo, trabadas una fila sí y otra no.
+  const f = fasciaOf(b);
   const courses = 6;
-  const gap = b.h / courses;
+  const gap = (b.h - f) / courses;
   const joint = Math.max(0.6, b.h * 0.012);
   onFront(ctx, b, () => {
+    ctx.translate(0, f);
     ctx.fillStyle = 'rgba(255, 255, 255, 0.18)';
     for (let i = 1; i < courses; i++) ctx.fillRect(0, gap * i, b.w, joint);
     ctx.fillStyle = 'rgba(38, 32, 24, 0.1)';
@@ -667,23 +827,19 @@ function drawLadrilleria(
     }
   });
 
-  // Claraboyas: dos fajas de vidrio a lo largo de la losa.
-  onRoof(ctx, b, () => {
-    ctx.fillStyle = 'rgba(159, 192, 204, 0.85)';
-    const w = b.w + eaveOf(b) * 2;
-    ctx.fillRect(w * 0.14, b.d * 0.16, w * 0.72, b.d * 0.22);
-    ctx.fillRect(w * 0.14, b.d * 0.56, w * 0.72, b.d * 0.22);
+  // Claraboyas: tres paños de vidrio a lo ancho de la losa, cada uno con su marco.
+  onRoof(ctx, b, (w, d) => {
+    for (let i = 0; i < 3; i++) {
+      const x = w * (0.1 + i * 0.28);
+      ctx.fillStyle = mix(GLASS, color, 0.12);
+      ctx.fillRect(x, d * 0.25, w * 0.2, d * 0.5);
+      // El canto de abajo, a la sombra: el paño está inclinado.
+      ctx.fillStyle = 'rgba(38, 32, 24, 0.22)';
+      ctx.fillRect(x, d * 0.75, w * 0.2, d * 0.1);
+    }
   });
 
-  const { cx, top } = drawStack(
-    ctx,
-    b,
-    t,
-    color,
-    hash01(seed) < 0.5 ? 0.08 : 0.76,
-    b.w * 0.16,
-    t * 0.19,
-  );
+  const { cx, top } = drawStack(ctx, b, t, color, hash01(seed) < 0.5 ? 0.06 : 0.8, 0.42, b.w * 0.13, t * 0.2);
 
   if (!activo) return;
   // Tres bocanadas que suben y se abren. El ciclo es largo: no distrae.
@@ -702,17 +858,15 @@ function drawLadrilleria(
 // Aserradero: galpón de madera con el techo a dos aguas de punta al frente,
 // tablas verticales, óculo en el frontón y troncos apilados al costado.
 function drawAserradero(ctx: CanvasRenderingContext2D, b: Box, t: number, color: string) {
-  const roofColor = darken(color, 0.36);
-  const rise = b.w * 0.36; // cuánto sube la cumbrera sobre el alero
-  const over = b.w * 0.1; // vuelo del alero
+  const rise = b.w * 0.24; // cuánto sube la cumbrera sobre el alero
   const top = b.y - b.h;
 
   // Troncos apilados al costado, sobre el piso.
-  const lr = t * 0.036;
+  const lr = t * 0.034;
   for (const [cx, cy] of [
-    [b.x - lr * 1.3, b.y - lr],
-    [b.x - lr * 3.1, b.y - lr],
-    [b.x - lr * 2.2, b.y - lr * 2.7],
+    [b.x - lr * 1.2, b.y - lr],
+    [b.x - lr * 3, b.y - lr],
+    [b.x - lr * 2.1, b.y - lr * 2.7],
   ]) {
     ctx.fillStyle = TRUNK;
     ctx.beginPath();
@@ -724,7 +878,7 @@ function drawAserradero(ctx: CanvasRenderingContext2D, b: Box, t: number, color:
     ctx.fill();
   }
 
-  volume(ctx, b, t, color, null);
+  volume(ctx, b, t, color, false);
 
   // Tablas verticales.
   onFront(ctx, b, () => {
@@ -732,76 +886,50 @@ function drawAserradero(ctx: CanvasRenderingContext2D, b: Box, t: number, color:
     for (let i = 1; i < 8; i++) ctx.fillRect((b.w * i) / 8, 0, Math.max(0.6, b.w * 0.012), b.h);
   });
 
-  ctx.save();
-  ctx.lineJoin = 'round';
-  ctx.lineCap = 'round';
-  ctx.lineWidth = Math.max(1, t * 0.016);
-  ctx.strokeStyle = darken(color, 0.46);
-
-  // Techo: el triángulo de afuera. Lo que sobresale del frontón es el faldón.
-  poly(ctx, [
-    [b.x - over, top],
-    [b.x + b.w / 2, top - rise - b.d],
-    [b.x + b.w + over, top],
-  ]);
-  ctx.fillStyle = roofColor;
-  ctx.fill();
-  ctx.stroke();
-
-  // Frontón: la pared triangular que mira al frente.
-  poly(ctx, [
-    [b.x, top],
-    [b.x + b.w / 2, top - rise],
-    [b.x + b.w, top],
-  ]);
-  ctx.fillStyle = lighten(color, 0.36);
-  ctx.fill();
-  ctx.stroke();
-  ctx.restore();
+  gableRoof(ctx, b, t, lighten(color, 0.12), darken(color, 0.3), darken(color, 0.46), rise, b.w * 0.08);
 
   // Óculo del frontón, por donde se sube la madera.
   ctx.fillStyle = darken(color, 0.44);
   ctx.beginPath();
-  ctx.arc(b.x + b.w / 2, top - rise * 0.46, b.w * 0.06, 0, Math.PI * 2);
+  ctx.arc(b.x + b.w / 2, top - rise * 0.4, b.w * 0.055, 0, Math.PI * 2);
   ctx.fill();
 }
 
-// Generador: usina angosta y alta, losa con dos chimeneas cortas y el cartel del rayo.
+// Generador: usina angosta y alta, losa con dos chimeneas cortas y el rayo pintado en el techo.
 function drawGenerador(ctx: CanvasRenderingContext2D, b: Box, t: number, color: string) {
-  volume(ctx, b, t, color, darken(color, 0.34));
+  volume(ctx, b, t, color, true);
 
-  drawStack(ctx, b, t, color, 0.1, b.w * 0.17, t * 0.1);
-  drawStack(ctx, b, t, color, 0.72, b.w * 0.17, t * 0.13);
+  // Rayo pintado sobre la losa, como se ve desde arriba.
+  onRoof(ctx, b, (w, d) => {
+    const r = Math.min(d * 0.34, w * 0.2);
+    const cx = w / 2;
+    const cy = d * 0.6;
+    ctx.fillStyle = darken(color, 0.42);
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
+    const bolt: [number, number][] = [
+      [0.6, 0],
+      [0.12, 0.56],
+      [0.42, 0.56],
+      [0.32, 1],
+      [0.88, 0.4],
+      [0.54, 0.4],
+    ];
+    ctx.fillStyle = '#ffd257';
+    ctx.strokeStyle = '#ffd257';
+    ctx.lineWidth = r * 0.16;
+    ctx.lineJoin = 'round';
+    poly(
+      ctx,
+      bolt.map(([bx, by]) => [cx - r * 0.5 + r * bx, cy - r * 0.62 + r * 1.24 * by] as [number, number]),
+    );
+    ctx.fill();
+    ctx.stroke();
+  });
 
-  // Cartel del rayo, montado sobre el borde del techo: el frente es angosto y
-  // abajo ya están las ventanas y la puerta.
-  const r = Math.min(b.w * 0.22, t * 0.055);
-  const cx = b.x + b.w / 2;
-  const cy = b.y - b.h - b.d * 0.5;
-  ctx.fillStyle = darken(color, 0.42);
-  ctx.beginPath();
-  ctx.arc(cx, cy, r, 0, Math.PI * 2);
-  ctx.fill();
-  const bolt: [number, number][] = [
-    [0.6, 0],
-    [0.12, 0.56],
-    [0.42, 0.56],
-    [0.32, 1],
-    [0.88, 0.4],
-    [0.54, 0.4],
-  ];
-  ctx.save();
-  ctx.fillStyle = '#ffd257';
-  ctx.strokeStyle = '#ffd257';
-  ctx.lineWidth = r * 0.2;
-  ctx.lineJoin = 'round';
-  poly(
-    ctx,
-    bolt.map(([bx, by]) => [cx - r * 0.6 + r * 1.2 * bx, cy - r * 0.66 + r * 1.32 * by] as [number, number]),
-  );
-  ctx.fill();
-  ctx.stroke();
-  ctx.restore();
+  drawStack(ctx, b, t, color, 0.08, 0.5, b.w * 0.15, t * 0.1);
+  drawStack(ctx, b, t, color, 0.76, 0.5, b.w * 0.15, t * 0.13);
 }
 
 // Plaza: el lote no se edifica. Cantero con camino, un kiosco en el medio y un árbol por nivel.
@@ -826,23 +954,27 @@ function drawPlaza(ctx: CanvasRenderingContext2D, level: number, px: number, py:
     drawTree(ctx, px + t * fx, py + t * fy, t * size);
   }
 
-  drawKiosco(ctx, px + t * 0.48, py + t * 0.74, t * (0.24 + level * 0.025), t, darken(color, 0.36));
+  drawKiosco(ctx, px + t * 0.48, py + t * 0.74, t * (0.24 + level * 0.025), t, darken(color, 0.22));
 }
 
-// Kiosco de la plaza: tarima, cuatro columnas y un techo que vuela por encima.
-// Mismo punto de vista que los edificios: se ve el frente y el techo, no los costados.
+// Kiosco de la plaza: tarima, columnas y un techo de cuatro aguas que vuela por
+// encima. Mismo punto de vista que los edificios: de la planta se ve todo el techo.
 function drawKiosco(ctx: CanvasRenderingContext2D, cx: number, baseY: number, w: number, t: number, roof: string) {
   const h = w * 0.44; // alto de las columnas
+  const d = w * 0.6; // fondo de la planta
   const eave = baseY - h;
 
   ctx.fillStyle = 'rgba(38, 32, 24, 0.15)';
   ctx.beginPath();
-  ctx.ellipse(cx + w * 0.1, baseY, w * 0.46, w * 0.13, 0, 0, Math.PI * 2);
+  ctx.ellipse(cx + w * 0.16, baseY - d * 0.3, w * 0.52, d * 0.5, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // Tarima.
-  ctx.fillStyle = '#e2d7bd';
-  roundRect(ctx, cx - w * 0.42, baseY - w * 0.1, w * 0.84, w * 0.15, w * 0.05);
+  // Tarima: su piso visto desde arriba y el canto al frente.
+  ctx.fillStyle = '#efe6cf';
+  roundRect(ctx, cx - w * 0.44, baseY - d * 0.95, w * 0.88, d * 0.95, w * 0.05);
+  ctx.fill();
+  ctx.fillStyle = '#d8ccae';
+  roundRect(ctx, cx - w * 0.44, baseY - w * 0.04, w * 0.88, w * 0.1, [0, 0, w * 0.05, w * 0.05]);
   ctx.fill();
 
   ctx.fillStyle = '#f8f2e3';
@@ -850,23 +982,30 @@ function drawKiosco(ctx: CanvasRenderingContext2D, cx: number, baseY: number, w:
     ctx.fillRect(cx + w * dx - w * 0.045, eave, w * 0.09, h);
   }
 
+  // Cuatro aguas en punta: se ven los faldones de los costados y el de adelante.
+  const L = cx - w * 0.6;
+  const R = cx + w * 0.6;
+  const back = eave - d;
+  const apex: [number, number] = [cx, back - w * 0.16]; // en punta: asoma por encima del fondo
   ctx.save();
   ctx.lineJoin = 'round';
   ctx.lineWidth = Math.max(1, t * 0.014);
-  ctx.strokeStyle = darken(roof, 0.25);
-  poly(ctx, [
-    [cx - w * 0.62, eave],
-    [cx, eave - w * 0.34],
-    [cx + w * 0.62, eave],
-  ]);
-  ctx.fillStyle = roof;
-  ctx.fill();
-  ctx.stroke();
+  ctx.strokeStyle = darken(roof, 0.3);
+  for (const [pts, fill] of [
+    [[[L, back], [L, eave], apex], lighten(roof, 0.18)],
+    [[[R, back], [R, eave], apex], darken(roof, 0.12)],
+    [[[L, eave], [R, eave], apex], roof],
+  ] as [[number, number][], string][]) {
+    poly(ctx, pts);
+    ctx.fillStyle = fill;
+    ctx.fill();
+    ctx.stroke();
+  }
   ctx.restore();
 
-  ctx.fillStyle = roof;
+  ctx.fillStyle = darken(roof, 0.2);
   ctx.beginPath();
-  ctx.arc(cx, eave - w * 0.4, w * 0.06, 0, Math.PI * 2);
+  ctx.arc(apex[0], apex[1] - w * 0.03, w * 0.05, 0, Math.PI * 2);
   ctx.fill();
 }
 
@@ -1048,11 +1187,11 @@ function drawWorkBuilding(ctx: CanvasRenderingContext2D, work: PublicWork, px: n
   const done = work.status === 'completada';
   const stone = '#f3ecd9';
   const trim = done ? '#c2a047' : '#a39a86';
-  const w = t * 0.54;
-  const b: Box = { x: px + (t - w) / 2, y: py + t * 0.76, w, h: t * 0.24, d: t * ROOF };
+  const w = t * 0.6;
+  const b: Box = { x: px + (t - w) / 2, y: py + t * 0.8, w, h: t * 0.19, d: t * 0.3 };
 
   castShadow(ctx, b);
-  volume(ctx, b, t, stone, null);
+  volume(ctx, b, t, stone, false);
 
   // Columnas en el frente.
   onFront(ctx, b, () => {
@@ -1062,33 +1201,8 @@ function drawWorkBuilding(ctx: CanvasRenderingContext2D, work: PublicWork, px: n
     }
   });
 
-  ctx.save();
-  ctx.lineJoin = 'round';
-  ctx.lineCap = 'round';
-  ctx.lineWidth = Math.max(1, t * 0.016);
-  ctx.strokeStyle = darken(stone, 0.42);
-
-  // Frontón, con el mismo espesor de alero que los techos a dos aguas.
-  const top = b.y - b.h;
-  const rise = b.w * 0.2;
-  const over = b.w * 0.07;
-  poly(ctx, [
-    [b.x - over, top],
-    [b.x + b.w / 2, top - rise - b.d],
-    [b.x + b.w + over, top],
-  ]);
-  ctx.fillStyle = darken(stone, 0.22);
-  ctx.fill();
-  ctx.stroke();
-  poly(ctx, [
-    [b.x, top],
-    [b.x + b.w / 2, top - rise],
-    [b.x + b.w, top],
-  ]);
-  ctx.fillStyle = stone;
-  ctx.fill();
-  ctx.stroke();
-  ctx.restore();
+  // Techo a dos aguas con el frontón al frente, como un templo.
+  gableRoof(ctx, b, t, stone, darken(stone, done ? 0.12 : 0.2), darken(stone, 0.42), b.w * 0.16, b.w * 0.06);
 
   // Escalinata al frente.
   ctx.fillStyle = darken(stone, 0.16);

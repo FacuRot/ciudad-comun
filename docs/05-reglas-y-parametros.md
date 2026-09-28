@@ -252,7 +252,7 @@ Todos son idempotentes: correrlos dos veces no produce efectos dobles.
 
 Cada barrio tiene una población de ciudadanos: gente que no juega, vive en el barrio y se muda según cómo esté. Es el termómetro colectivo: sube si el barrio está habitado, mantenido y abastecido, y baja si no.
 
-Los ciudadanos **no tocan la producción ni las jornadas de nadie**. Si lo hicieran, se armaría una espiral (se va gente → se produce menos → se va más gente) y el que se queda pagaría por el que se fue. Lo que dan:
+Los ciudadanos **no tocan la producción ni las jornadas de nadie**. Si lo hicieran, se armaría una espiral (se va gente → se produce menos → se va más gente) y el que se queda pagaría por el que se fue. La única excepción es el alquiler del residencial (§17.1), y es buscada: solo la sufre quien eligió depender del barrio. Lo que dan:
 
 - **Abren el Barrio 2** por una vía nueva (§16.4).
 - **Se ven:** la gente que camina por las veredas de cada barrio crece con su población.
@@ -284,7 +284,7 @@ Un número entre 0 y 1 por barrio: el promedio ponderado de cuatro factores, cad
 |-----------|-------|-------|
 | Consumo por ciudadano | 2 materiales por día | `citizens.consumption_per_day` |
 
-- Producción diaria del barrio = suma de `tasa_efectiva × 24` de sus lotes (§3), de cualquier material. Es solo una medida: **no se le descuenta ningún material a nadie**. Con población 0, el abastecimiento vale 1.
+- Producción diaria del barrio = suma de `tasa_efectiva × 24` de sus lotes (§3), de cualquier material, sin el alquiler de los residenciales (§17.1). Es solo una medida: **no se le descuenta ningún material a nadie**. Con población 0, el abastecimiento vale 1.
 - Mientras la obra no esté terminada, el atractivo no pasa de 0,9. La Escuela y el Hospital suman así un motivo más para terminarlos.
 - **Motivo principal:** el factor que más resta (`peso × (1 − factor)`). Es lo que ve el jugador: "se van por las calles rotas", "hay lotes descuidados", "falta producción", "falta la Escuela".
 
@@ -335,11 +335,31 @@ Quinto tipo de edificio: `residencial`. Se construye en el lote propio, como cua
 
 | Tipo | Produce | Efecto |
 |------|---------|--------|
-| `residencial` | nada | Aloja 30 / 60 / 100 ciudadanos según el nivel, en vez de 10 (§16.1) |
+| `residencial` | Alquiler: el material que elige el dueño, según el atractivo del barrio (§17.1) | Aloja 30 / 60 / 100 ciudadanos según el nivel, en vez de 10 (§16.1) |
 
 - Usa la tabla de costos y tiempos de §3, como la plaza, y se puede ayudar como cualquier construcción.
-- Como todo tipo, se elige en el nivel 1 y no se cambia. Quien construye un residencial renuncia a producir: es un gesto hacia el barrio, igual que la plaza.
+- Como todo tipo, se elige en el nivel 1 y no se cambia.
 - Suma capacidad solo a su barrio.
+
+### 17.1 Alquiler
+
+Sin producción propia, al dueño de un residencial no lo traería de vuelta nada suyo: ni materiales para recoger ni con qué subir de nivel sin depender por completo de regalos. Por eso el residencial cobra alquiler: produce como cualquier edificio, pero su tasa depende de cómo está el barrio.
+
+```
+tasa_efectiva(residencial) = tasa_efectiva de §3 × atractivo del barrio (§16.2)
+```
+
+- El dueño elige el material del alquiler (ladrillo, madera o energía) al construir el nivel 1, y no se cambia. Es un solo material, como en los demás edificios, así que tampoco avanza solo.
+- Se recoge como cualquier producción: de forma perezosa y con tope de 48 h. El atractivo se toma en el momento de recoger, igual que los otros factores de la fórmula.
+- **No cuenta para el abastecimiento** (§16.2). Si contara, una baja de población bajaría el alquiler, eso bajaría el abastecimiento y se iría más gente.
+- Depende del atractivo y no de la ocupación del barrio (población ÷ capacidad) por dos motivos. La población arranca en 0 y tarda días en llenar el barrio, así que quien construyera un residencial la primera semana no cobraría casi nada. Y el atractivo se mueve en el día: si hoy se mantienen las calles, el alquiler sube hoy.
+
+Orden de magnitud: sin la obra terminada el atractivo no pasa de 0,9, así que un residencial nivel 1 rinde como mucho 43 por día, contra 48 de una ladrillería. Con calles rotas y lotes descuidados el atractivo ronda 0,6, y rinde unos 29. Esa diferencia es el precio de alojar el triple de ciudadanos y de depender de los vecinos. Si muchos construyen residenciales, cae el abastecimiento, baja el atractivo y baja el alquiler de todos ellos, así que se regula solo.
+
+### 17.2 Qué ve el dueño
+
+- **Panel "Mi lote":** el alquiler actual por hora y el atractivo desglosado en sus cuatro factores, con el que más resta marcado.
+- **Resumen al volver:** "Tu residencial rindió al 86 %. Lo que más resta: las calles." Le dice qué arreglar, y arreglarlo está en sus manos (§18).
 
 ## 18. Mantenimiento de calles
 
@@ -374,9 +394,9 @@ Una celda de calle pertenece al barrio que tiene más lotes a su alrededor, y se
 **En este documento:**
 
 - §1: fila nueva "Mantener calles · 1 · Barrio". Cuenta como jornada colectiva.
-- §3: cinco tipos; `residencial` se suma a la tabla de tipos.
+- §3: cinco tipos; `residencial` se suma a la tabla de tipos, y la tasa efectiva agrega el factor de atractivo para el residencial (§17.1).
 - §8: tercera condición de apertura (§16.4).
-- §11: línea nueva en el resumen, después de "Barrio abierto": "Ciudadanos de tu barrio: llegaron N / se fueron N", con el motivo principal y, si las calles están gastadas o rotas, un aviso. Cambia el orden del resumen, así que entra con esta revisión.
+- §11: línea nueva en el resumen, después de "Barrio abierto": "Ciudadanos de tu barrio: llegaron N / se fueron N", con el motivo principal y, si las calles están gastadas o rotas, un aviso. Al dueño de un residencial se le suma cuánto rindió el alquiler (§17.2). Cambia el orden del resumen, así que entra con esta revisión.
 - §13: job nuevo `update_population`, diario a las 00:20 (después de `update_lot_states`). Es idempotente: una actualización por barrio por día del juego.
 - §14: claves nuevas (abajo).
 - §15: señales nuevas (abajo).
@@ -384,11 +404,11 @@ Una celda de calle pertenece al barrio que tiene más lotes a su alrededor, y se
 **En otros documentos:**
 
 - `02-alcance-prototipo.md`: sumar ciudadanos, residencial y mantenimiento de calles a "Se construye".
-- `04-modelo-de-datos.md`: columnas nuevas en `barrios` (población, estado de calles y fecha de su última actualización), sin tabla nueva. Eventos nuevos: `streets.maintained` (`{barrio_id, points, state}`) y `barrio.population_changed` (`{day, from, to, target, capacity, attractiveness, main_reason}`).
-- `06-acciones-y-api.md`: acción `maintain_streets(p_barrio_id)`, con códigos nuevos para "las calles ya están al día" y "ya mantuviste hoy".
+- `04-modelo-de-datos.md`: columnas nuevas en `barrios` (población, estado de calles y fecha de su última actualización) y en `lots` (material del alquiler, solo para residenciales), sin tabla nueva. Eventos nuevos: `streets.maintained` (`{barrio_id, points, state}`) y `barrio.population_changed` (`{day, from, to, target, capacity, attractiveness, main_reason}`).
+- `06-acciones-y-api.md`: acción `maintain_streets(p_barrio_id)`, con códigos nuevos para "las calles ya están al día" y "ya mantuviste hoy". `build` recibe el material del alquiler cuando el tipo es `residencial`, con un código para cuando falta o no es válido.
 - `07-pantallas-y-flujos.md`: el panel del barrio con población, factores y calles.
 
-**Claves nuevas en `config`** (se suman a §14; `barrio.open_population` va dentro de `barrio`, y `residencial` se agrega a `buildings.types` y a `buildings.produces` con `null`):
+**Claves nuevas en `config`** (se suman a §14; `barrio.open_population` va dentro de `barrio`, y `residencial` se agrega a `buildings.types` y a `buildings.produces` con `null`, porque su material lo elige el dueño y queda guardado en el lote):
 
 ```json
 {
@@ -404,7 +424,9 @@ Una celda de calle pertenece al barrio que tiene más lotes a su alrededor, y se
 
 **Señales nuevas para §15:**
 
-- **Nadie construye residenciales:** la vía de la población queda muerta. Antes de bajar el umbral, pensar si el residencial necesita dar algo a su dueño.
+- **Nadie construye residenciales:** la vía de la población queda muerta. Mirar el atractivo promedio: si ronda 0,6, el alquiler no compensa y el problema es el barrio, no el residencial.
+- **Más de un tercio de los lotes son residenciales:** el alquiler compensa demasiado, o el abastecimiento no está frenando. Revisar el consumo por ciudadano antes que la capacidad.
+- **Los dueños de residenciales no mantienen calles más que el resto:** el alquiler no los está moviendo. Revisar que el resumen y el panel muestren lo que más resta.
 - **Las calles siempre en 100:** o el desgaste es bajo, o mantener es una tarea que gusta (buena noticia). Mirar cuántos jugadores distintos mantienen.
 - **Las calles llegan a 0 en la primera semana:** nadie las ve o cuesta demasiado. Revisar lo que se ve en el mapa antes que los números.
 - **El abastecimiento siempre en 1:** el consumo es bajo y el factor no dice nada.

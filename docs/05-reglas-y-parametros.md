@@ -245,3 +245,168 @@ Todos son idempotentes: correrlos dos veces no produce efectos dobles.
 - **Muchas jornadas sin usar al final del día (cap alcanzado):** hay poco que hacer; no bajar el cap, agregar destinos para la jornada.
 - **Todos construyen plazas:** el bonus es demasiado alto o la gente prefiere el gesto pro-social; el segundo caso es una buena noticia.
 - **Nadie cuida lotes:** o nadie se ausentó (bien) o cuidar no se ve; revisar el ícono en el mapa antes que la regla.
+
+## 16. Ciudadanos
+
+> **Propuesta del 28/09/2026, pendiente de revisión.** Las secciones 16 a 19 no están implementadas y todavía no figuran en `02-alcance-prototipo.md`. Los números son iniciales y se calibran con el script de bots antes de la cohorte. Cuando se aprueben, §19 dice qué cambia en las secciones anteriores.
+
+Cada barrio tiene una población de ciudadanos: gente que no juega, vive en el barrio y se muda según cómo esté. Es el termómetro colectivo: sube si el barrio está habitado, mantenido y abastecido, y baja si no.
+
+Los ciudadanos **no tocan la producción ni las jornadas de nadie**. Si lo hicieran, se armaría una espiral (se va gente → se produce menos → se va más gente) y el que se queda pagaría por el que se fue. Lo que dan:
+
+- **Abren el Barrio 2** por una vía nueva (§16.4).
+- **Se ven:** la gente que camina por las veredas de cada barrio crece con su población.
+
+### 16.1 Capacidad
+
+| Parámetro | Valor | Clave |
+|-----------|-------|-------|
+| Ciudadanos por lote con edificio (cualquier tipo salvo residencial) | 10 | `citizens.capacity_per_lot` |
+| Ciudadanos por residencial, nivel 1 / 2 / 3 | 30 / 60 / 100 | `residential.capacity_by_level` |
+
+- Capacidad del barrio = suma de lo que alojan sus lotes con edificio de nivel 1 o más. Un lote libre, o con su primera construcción en curso, no aloja a nadie.
+- Durante una mejora cuenta el nivel anterior, igual que la producción.
+- El estado del lote no cambia la capacidad: un lote abandonado sigue teniendo casas. Al abandono lo castiga el atractivo, para no descontarlo dos veces.
+- La capacidad no baja nunca en el prototipo: no se demuele nada.
+
+### 16.2 Atractivo
+
+Un número entre 0 y 1 por barrio: el promedio ponderado de cuatro factores, cada uno entre 0 y 1.
+
+| Factor | Qué mide | Cómo se calcula | Peso | Clave |
+|--------|----------|-----------------|------|-------|
+| Lotes | Que los vecinos estén | Promedio de `production.state_factor` de los lotes con dueño (activo 1, descuidado 0,5, abandonado 0) | 30 % | `citizens.weights.lotes` |
+| Calles | Que las calles estén mantenidas | Estado de las calles ÷ 100 (§18) | 30 % | `citizens.weights.calles` |
+| Abastecimiento | Que el barrio produzca lo que su gente necesita | Producción diaria del barrio ÷ (población × consumo), con tope 1 | 30 % | `citizens.weights.abastecimiento` |
+| Obra | Que la obra pública del barrio esté terminada | 1 si está completada, 0 si no | 10 % | `citizens.weights.obra` |
+
+| Parámetro | Valor | Clave |
+|-----------|-------|-------|
+| Consumo por ciudadano | 2 materiales por día | `citizens.consumption_per_day` |
+
+- Producción diaria del barrio = suma de `tasa_efectiva × 24` de sus lotes (§3), de cualquier material. Es solo una medida: **no se le descuenta ningún material a nadie**. Con población 0, el abastecimiento vale 1.
+- Mientras la obra no esté terminada, el atractivo no pasa de 0,9. La Escuela y el Hospital suman así un motivo más para terminarlos.
+- **Motivo principal:** el factor que más resta (`peso × (1 − factor)`). Es lo que ve el jugador: "se van por las calles rotas", "hay lotes descuidados", "falta producción", "falta la Escuela".
+
+Orden de magnitud: una ladrillería nivel 1 produce 48 por día y aloja 10 ciudadanos que consumen 20, así que le sobran 28. Un residencial nivel 1 (30 ciudadanos, 60 por día) necesita algo más que el sobrante de dos lotes productivos nivel 1. Un barrio que se llena de residenciales sin subir la producción se queda sin abastecimiento.
+
+### 16.3 Cómo cambia la población
+
+Una vez por día, después de recalcular los estados de los lotes:
+
+```
+objetivo = floor(capacidad × atractivo)
+si población < objetivo:  llegan  ceil((objetivo − población) × arrival_rate)
+si población > objetivo:  se van  ceil((población − objetivo) × departure_rate)
+```
+
+| Parámetro | Valor | Clave |
+|-----------|-------|-------|
+| Llegan por día | 30 % de la diferencia | `citizens.arrival_rate` |
+| Se van por día | 15 % de la diferencia | `citizens.departure_rate` |
+
+- Irse es más lento que llegar, a propósito: un descuido de un par de días se nota, pero no vacía el barrio.
+- La población nunca pasa la capacidad ni baja de 0.
+- Emite un evento `barrio.population_changed` por barrio y por día del juego, aunque no cambie nada. Eso hace idempotente al job, como `jornadas.refilled`.
+- El Barrio 1 arranca en 0. El Barrio 2 arranca en 0 cuando se abre.
+
+Orden de magnitud: con 30 lotes con edificio y atractivo 0,8, el objetivo es 240. Desde 0 se llega a unos 180 en 4 días y a unos 220 en 7. En la práctica tarda más, porque la capacidad crece a medida que entran jugadores.
+
+### 16.4 Apertura del Barrio 2 por población
+
+Se suma una tercera condición a §8: el Barrio 2 abre cuando el Barrio 1 llega a **300 ciudadanos**, cuando tiene el 85 % de los lotes ocupados o a los 10 días, lo que pase primero. El evento `barrio.opened` lleva `reason: 'poblacion'`.
+
+| Parámetro | Valor | Clave |
+|-----------|-------|-------|
+| Población del Barrio 1 que abre el Barrio 2 | 300 | `barrio.open_population` |
+
+- Las otras dos condiciones se quedan porque garantizan lugar para los invitados nuevos. La población es la vía que se gana con un barrio sano.
+- Sin residenciales casi no se llega: 30 lotes productivos alojan 300 y el atractivo nunca es 1, y con 35 lotes ya abre por ocupación. Con 28 lotes productivos, 2 residenciales nivel 1, la Escuela terminada y el barrio casi impecable, el objetivo ronda los 320, y la población lo alcanza unos días después.
+- Es el número más sensible de esta propuesta. Se calibra con los bots para que un barrio sano llegue entre el día 6 y el 8.
+
+### 16.5 Cómo se ve
+
+- **Panel del barrio:** "Barrio 1 · 182 de 240 ciudadanos", con flecha de tendencia, los cuatro factores como barras y el motivo principal en una línea.
+- **Mapa:** la gente que camina por las veredas de un barrio crece con su población. Los autos dependen del estado de las calles (§18).
+
+## 17. Residencial
+
+Quinto tipo de edificio: `residencial`. Se construye en el lote propio, como cualquier otro. En la UI se llama "Residencial" y no "barrio residencial", para no confundirlo con los barrios del mapa.
+
+| Tipo | Produce | Efecto |
+|------|---------|--------|
+| `residencial` | nada | Aloja 30 / 60 / 100 ciudadanos según el nivel, en vez de 10 (§16.1) |
+
+- Usa la tabla de costos y tiempos de §3, como la plaza, y se puede ayudar como cualquier construcción.
+- Como todo tipo, se elige en el nivel 1 y no se cambia. Quien construye un residencial renuncia a producir: es un gesto hacia el barrio, igual que la plaza.
+- Suma capacidad solo a su barrio.
+
+## 18. Mantenimiento de calles
+
+Cada barrio tiene un estado de calles de 0 a 100. Baja solo con los días, y lo suben los vecinos gastando jornada y ladrillo. Las calles son la primera estructura con mantenimiento; las siguientes (luminarias, mantenimiento de la Escuela y el Hospital) entrarían como factores nuevos del atractivo, sin cambiar §16.3.
+
+| Parámetro | Valor | Clave |
+|-----------|-------|-------|
+| Estado inicial | 100 | `streets.initial` |
+| Desgaste | 10 puntos por día | `streets.decay_per_day` |
+| Costo de mantener | 1 jornada + 10 ladrillo | `streets.cost` |
+| Puntos por mantenimiento | 4 | `streets.points` |
+| Mantenimientos por jugador, por barrio y por día | 1 | `streets.max_per_player_per_day` |
+
+- El desgaste es continuo y se calcula de forma perezosa, como la producción: `estado = estado guardado − desgaste × días desde la última actualización`, sin bajar de 0. Ningún job lo resta.
+- El Barrio 2 arranca en 100 al abrirse. Mientras está cerrado, sus calles no se gastan.
+- Mantener suma 4 puntos, con tope de 100. No se puede si ya están en 100. Se puede mantener cualquier barrio, no solo el propio, y cuenta como jornada colectiva.
+- Con 10 de desgaste y 4 puntos por vez, hacen falta **tres vecinos distintos por día** para sostener las calles. El tope de uno por jugador y por día es lo que obliga a que sea tarea de varios.
+- Si nadie mantiene, las calles pasan de 100 a 0 en 10 días. Calles en 0 bajan el objetivo de población un 30 % de la capacidad, y a un 15 % diario de la diferencia el barrio pierde gente de a poco, no de golpe.
+- Solo las ladrillerías producen ladrillo. El resto mantiene con el kit inicial o con ladrillo regalado.
+- El panel del barrio muestra quién mantuvo las calles en los últimos 7 días, sacado de los eventos.
+
+| Estado | Rango | En el mapa |
+|--------|-------|------------|
+| Buenas | 70–100 | Como hoy |
+| Gastadas | 40–69 | Grietas y algún bache |
+| Rotas | 0–39 | Baches y pocos autos |
+
+Una celda de calle pertenece al barrio que tiene más lotes a su alrededor, y se dibuja con el estado de ese barrio.
+
+## 19. Qué cambia en lo demás cuando se apruebe
+
+**En este documento:**
+
+- §1: fila nueva "Mantener calles · 1 · Barrio". Cuenta como jornada colectiva.
+- §3: cinco tipos; `residencial` se suma a la tabla de tipos.
+- §8: tercera condición de apertura (§16.4).
+- §11: línea nueva en el resumen, después de "Barrio abierto": "Ciudadanos de tu barrio: llegaron N / se fueron N", con el motivo principal y, si las calles están gastadas o rotas, un aviso. Cambia el orden del resumen, así que entra con esta revisión.
+- §13: job nuevo `update_population`, diario a las 00:20 (después de `update_lot_states`). Es idempotente: una actualización por barrio por día del juego.
+- §14: claves nuevas (abajo).
+- §15: señales nuevas (abajo).
+
+**En otros documentos:**
+
+- `02-alcance-prototipo.md`: sumar ciudadanos, residencial y mantenimiento de calles a "Se construye".
+- `04-modelo-de-datos.md`: columnas nuevas en `barrios` (población, estado de calles y fecha de su última actualización), sin tabla nueva. Eventos nuevos: `streets.maintained` (`{barrio_id, points, state}`) y `barrio.population_changed` (`{day, from, to, target, capacity, attractiveness, main_reason}`).
+- `06-acciones-y-api.md`: acción `maintain_streets(p_barrio_id)`, con códigos nuevos para "las calles ya están al día" y "ya mantuviste hoy".
+- `07-pantallas-y-flujos.md`: el panel del barrio con población, factores y calles.
+
+**Claves nuevas en `config`** (se suman a §14; `barrio.open_population` va dentro de `barrio`, y `residencial` se agrega a `buildings.types` y a `buildings.produces` con `null`):
+
+```json
+{
+  "citizens": { "capacity_per_lot": 10, "consumption_per_day": 2,
+                "weights": { "lotes": 0.3, "calles": 0.3, "abastecimiento": 0.3, "obra": 0.1 },
+                "arrival_rate": 0.30, "departure_rate": 0.15 },
+  "residential": { "capacity_by_level": { "1": 30, "2": 60, "3": 100 } },
+  "streets": { "initial": 100, "decay_per_day": 10, "points": 4,
+               "cost": { "ladrillo": 10 }, "max_per_player_per_day": 1 },
+  "barrio": { "open_population": 300 }
+}
+```
+
+**Señales nuevas para §15:**
+
+- **Nadie construye residenciales:** la vía de la población queda muerta. Antes de bajar el umbral, pensar si el residencial necesita dar algo a su dueño.
+- **Las calles siempre en 100:** o el desgaste es bajo, o mantener es una tarea que gusta (buena noticia). Mirar cuántos jugadores distintos mantienen.
+- **Las calles llegan a 0 en la primera semana:** nadie las ve o cuesta demasiado. Revisar lo que se ve en el mapa antes que los números.
+- **El abastecimiento siempre en 1:** el consumo es bajo y el factor no dice nada.
+
+**Pendiente de decidir:** después de abrir el Barrio 2, los ciudadanos solo se ven; no dan nada más. Si hace falta un segundo efecto, que no toque la producción individual (ver §16).

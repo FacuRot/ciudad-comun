@@ -57,10 +57,10 @@ Barra superior: jornadas (con puntos llenos/vacíos, 6 posiciones) e inventario.
 
 - Grilla 12×8, tile de tamaño fijo. La ciudad se apoya sobre un tablero de esquinas redondeadas con sombra.
 - El suelo se mira desde arriba y lo construido se mira de frente con el ojo alto: se ve el frente y el techo entero (la planta del edificio, corrida hacia arriba tanto como mide la pared), nunca los costados. La luz viene de la izquierda: el techo es lo más claro, el frente va un tono más apagado y cada edificio tira sombra sobre el piso hacia la derecha, con una franja oscura donde la pared toca el suelo. Los volúmenes se pintan de arriba hacia abajo del mapa: lo que está más abajo está más cerca y tapa a lo de atrás.
-- Calles: vereda, cordón claro y calzada que se encadena entre celdas, con línea de eje punteada, sendas peatonales al llegar a un cruce y arbolitos en la vereda.
-- Tránsito, solo de adorno (no depende de nada del juego): pocos autos vistos desde arriba —algún taxi negro con techo amarillo y de vez en cuando un colectivo— cruzan la ciudad por las avenidas que van de borde a borde, por la mano derecha y sin doblar. En un cruce pasa una avenida por vez y frenan antes de la senda si alguien está cruzando. Transeúntes caminan por el medio de la vereda, doblan en las esquinas, cruzan por las sendas cuando no viene un auto y pasan por detrás de los arbolitos. Entran y salen por el borde del tablero. Unos 4 autos y 6 personas de día, menos al atardecer y apenas un par de cada uno de noche, cuando los autos llevan los faros prendidos. Con "reducir movimiento" activado en el sistema no aparecen.
+- Calles: vereda, cordón claro y calzada que se encadena entre celdas, con línea de eje punteada, sendas peatonales al llegar a un cruce y arbolitos en la vereda. Cada celda de calle es del barrio con más lotes alrededor (`05` §18) y se dibuja con el estado de sus calles: buenas, como siempre; gastadas, con grietas y algún bache; rotas, con baches por todos lados.
+- Tránsito y gente, que muestran el juego pero no lo cambian: pocos autos vistos desde arriba —algún taxi negro con techo amarillo y de vez en cuando un colectivo— cruzan la ciudad por las avenidas que van de borde a borde, por la mano derecha y sin doblar. En un cruce pasa una avenida por vez y frenan antes de la senda si alguien está cruzando. Transeúntes caminan por el medio de la vereda, doblan en las esquinas, cruzan por las sendas cuando no viene un auto y pasan por detrás de los arbolitos. Entran y salen por el borde del tablero. La gente de cada barrio sale de su población (`05` §16.5): casi nadie con el barrio vacío y una persona más cada 25 ciudadanos, hasta 8 por barrio. Los autos, unos 4 de día, bajan con las calles rotas: una avenida pierde autos según cuánto de su largo está roto. Menos de todo al atardecer y apenas un par de noche, cuando los autos llevan los faros prendidos. Con "reducir movimiento" activado en el sistema no aparecen.
 - El lote construido no se pinta: el edificio se apoya directo sobre el mapa, sin cuadro de color detrás, y el color elegido por el dueño va en las paredes. El lote tomado que todavía no tiene nada construido sí muestra la marca del lote en ese color. El nivel se ve en el alto de las paredes y en cuántas ventanas tiene el frente (una por nivel).
-- Tipo de edificio: cada oficio es un edificio distinto, no un objeto ni un glifo. Ladrillería: fábrica de ladrillo a la vista, losa con parapeto y claraboyas y una chimenea parada sobre el techo que humea mientras el lote está activo. Aserradero: galpón de madera con el techo a dos aguas de punta al frente, óculo en el frontón, portón y troncos apilados al costado. Generador: usina angosta y alta, losa con dos chimeneas cortas y el rayo pintado sobre la losa. Plaza: el lote no se edifica — cantero con camino, un kiosco con techo en punta en el medio y un árbol por nivel. El glifo (■ ▲ ⚡ ✿) queda solo en los paneles. Sin sprites ni imágenes: todo son formas del canvas.
+- Tipo de edificio: cada oficio es un edificio distinto, no un objeto ni un glifo. Ladrillería: fábrica de ladrillo a la vista, losa con parapeto y claraboyas y una chimenea parada sobre el techo que humea mientras el lote está activo. Aserradero: galpón de madera con el techo a dos aguas de punta al frente, óculo en el frontón, portón y troncos apilados al costado. Generador: usina angosta y alta, losa con dos chimeneas cortas y el rayo pintado sobre la losa. Plaza: el lote no se edifica — cantero con camino, un kiosco con techo en punta en el medio y un árbol por nivel. Residencial: edificio de departamentos, más alto y angosto que los demás del mismo nivel, con balcones en el frente y un tanque de agua sobre la losa. El glifo (■ ▲ ⚡ ✿ ⌂) queda solo en los paneles. Sin sprites ni imágenes: todo son formas del canvas.
 - Estado: `activo` color pleno; `descuidado` color desaturado al 50 % con un ícono de pasto; `abandonado` gris con ícono de "cuidar" (una mano) visible.
 - Construcción en curso: borde animado (línea que gira) y un pequeño reloj con el tiempo restante al hacer hover o tocar.
 - Obra pública: celda distinta (más grande visualmente, con borde doble), un edificio cívico con columnas y frontón en el mismo punto de vista, y una barra de progreso dibujada en la parte inferior. Completa, se pone dorada.
@@ -74,7 +74,8 @@ Barra superior: jornadas (con puntos llenos/vacíos, 6 posiciones) e inventario.
 
 - Nombre del lote (editable inline) y color (muestras).
 - Edificio actual: tipo, nivel, tasa de producción efectiva por hora con desglose ("2/h base · +10 % plaza vecina").
-- Si no hay edificio: selector de tipo con la frase "En tu barrio escasea: **energía**" calculada en el cliente (material con menor producción total del barrio). Costo del nivel 1 y botón "Construir (1 jornada, 2 h)".
+- Si es un residencial: el alquiler por hora y en qué material, con el atractivo en el desglose ("1,6/h de ladrillo · 2/h base × 78 % de atractivo"), cuántos ciudadanos aloja, y el atractivo del barrio con sus cuatro factores como barras, con el que más resta marcado (`05` §17.2).
+- Si no hay edificio: selector de tipo con la frase "En tu barrio escasea: **energía**" calculada en el cliente (material con menor producción total del barrio). Costo del nivel 1 y botón "Construir (1 jornada, 2 h)". Al elegir Residencial aparece "¿Qué vas a cobrar de alquiler?" con los tres materiales, y el botón no se habilita hasta elegir uno. Debajo: "Aloja 30 ciudadanos. El alquiler rinde según el atractivo del barrio: hoy 78 %, unos 1,6 por hora."
 - Si hay edificio y nivel < 3: costo del siguiente nivel, materiales que faltan en rojo, botón "Mejorar". Si faltan materiales, debajo: "Pediles a tus vecinos" con la lista de quiénes producen ese material en el barrio.
 - Si hay construcción en curso: tiempo restante, quiénes ayudaron.
 - Sección "Quién pasó por acá": visitas de los últimos 7 días.
@@ -101,6 +102,11 @@ Al abrirse llama a `visit_lot`.
 
 Se abre desde el pie del mapa. Muestra: producción total del barrio por material, cuántos lotes de cada tipo hay, cuántos lotes libres, y la obra con su progreso. Es la pantalla que le dice a un nuevo qué construir y a un veterano a quién ayudar.
 
+Además, dos secciones de lo colectivo (`05` §16 y §18). En un barrio cerrado no aparecen: dice "Se abre pronto".
+
+- **Ciudadanos.** "**182 de 240** ciudadanos ↑": la población y el objetivo de hoy (capacidad × atractivo). La flecha dice hacia dónde se mueve mañana: ↑ si van a llegar, ↓ si se van a ir, nada si ya está en el objetivo. Debajo, la capacidad: "Hay lugar para 300: 24 lotes con edificio y 2 residenciales". Los cuatro factores del atractivo como barras, cada uno con su porcentaje: Vecinos presentes, Calles, Abastecimiento y la obra por su nombre (Escuela). Una línea con el motivo principal: "Lo que más resta: **las calles**" (o los lotes descuidados, la falta de producción, que falta terminar la Escuela); si ninguno resta, "No le falta nada."
+- **Calles.** "Estado **64** de 100 · gastadas", con barra, y "Se gastan 10 por día; cada mantenimiento suma 4". Botón "Mantener (1 jornada, 10 ladrillo)". Deshabilitado, con el motivo en lugar del botón, si están en 100 ("Están al día"), si hoy ya las mantuvo ("Hoy ya las mantuviste"), o si le faltan jornadas o ladrillo. Abajo, quién las mantuvo en los últimos 7 días, con cuántas veces: "Marta (3), Juan (1)"; si nadie, "Nadie las mantuvo esta semana."
+
 ### Modal: Mientras no estabas
 
 Aparece al entrar si `heartbeat().show_summary`. Lista de líneas, con el orden de prioridad de `05-reglas-y-parametros.md` §11:
@@ -109,8 +115,13 @@ Aparece al entrar si `heartbeat().show_summary`. Lista de líneas, con el orden 
 > **Marta** ayudó en tu construcción.
 > **Julián** te regaló 20 de energía.
 > La **Escuela** avanzó del 40 % al 62 %.
+> Ciudadanos del **Barrio Fundadores**: llegaron **24**, se fueron **3**. Lo que más resta: **las calles**.
+> Las calles del barrio están **gastadas** (54 de 100). Mantenerlas cuesta 1 jornada y 10 de ladrillo.
+> Tu **residencial** rindió al **86 %**: cobraste **40 de ladrillo**.
 > **3 vecinos** pasaron por tu lote.
 > Recogiste **46 de madera**.
+
+Las tres líneas de ciudadanos son la 7 de §11. La de población suma todos los días que estuvo afuera y sale solo si llegó o se fue alguien; el motivo es el del último día. El aviso de calles sale si ahora están gastadas o rotas. La del residencial reemplaza a "Recogiste": el porcentaje es el atractivo con que se cobró.
 
 Un solo botón: "Ver la ciudad". Máximo 8 líneas; si hay más, "y 4 cosas más" que expande.
 

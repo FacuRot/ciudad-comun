@@ -7,7 +7,7 @@ Tres semanas, una cohorte, umbrales fijados antes de arrancar. El objetivo no es
 | # | Pregunta | Métrica | Umbral | Si falla, el problema está en… |
 |---|----------|---------|--------|--------------------------------|
 | H1 | ¿Vuelven? | De los que completaron la primera sesión (fundaron lote y gastaron ≥ 1 jornada), % que entra en el día 3 o después | > 50 % | el loop personal (producción, tiempos, resumen) |
-| H2 | ¿Actúan sobre lo colectivo? | Jornadas gastadas en ayudar + aportar + cuidar sobre jornadas totales gastadas | ≥ 33 % | el corazón: la interdependencia no se siente |
+| H2 | ¿Actúan sobre lo colectivo? | Jornadas gastadas en ayudar + aportar + cuidar + mantener calles sobre jornadas totales gastadas | ≥ 33 % | el corazón: la interdependencia no se siente |
 | H3 | ¿Hablan? | Mensajes en el grupo de WhatsApp no iniciados por el equipo, por día, de la semana 2 en adelante | ≥ 3 por día en promedio | el corazón: no hay motivo para coordinar |
 
 Las tres tienen que cumplirse. H1 sola es un juego idle más. H2 y H3 sin H1 es una comunidad que se aburre.
@@ -69,7 +69,7 @@ select p.id, p.display_name, p.created_at
   from players p
  where not p.is_admin
    and exists (select 1 from events e where e.actor_id = p.id
-                and e.type in ('construction.started','public_work.contributed','construction.helped','lot.cared')
+                and e.type in ('construction.started','public_work.contributed','construction.helped','lot.cared','streets.maintained')
                 and e.created_at < p.created_at + interval '1 day');
 
 -- H1: retención día 3 (volvió el día 3 o después, medido en días de calendario desde su alta)
@@ -91,11 +91,11 @@ select d as dia, count(distinct b.id) as jugadores
 
 -- H2: proporción de jornadas colectivas
 select
-  count(*) filter (where type in ('construction.helped','public_work.contributed','lot.cared')) * 100.0
+  count(*) filter (where type in ('construction.helped','public_work.contributed','lot.cared','streets.maintained')) * 100.0
   / nullif(count(*), 0) as jornadas_colectivas_pct,
   count(*) as jornadas_totales
   from events
- where type in ('construction.started','construction.helped','public_work.contributed','lot.cared')
+ where type in ('construction.started','construction.helped','public_work.contributed','lot.cared','streets.maintained')
    and actor_id in (select id from v_base);
 
 -- H2 por jugador (distribución)
@@ -103,7 +103,7 @@ select actor_id, p.display_name,
        count(*) filter (where type <> 'construction.started') as colectivas,
        count(*) as totales
   from events e join players p on p.id = e.actor_id
- where type in ('construction.started','construction.helped','public_work.contributed','lot.cared')
+ where type in ('construction.started','construction.helped','public_work.contributed','lot.cared','streets.maintained')
  group by actor_id, p.display_name order by colectivas desc;
 
 -- Regalos: quién dio, quién recibió
@@ -145,7 +145,7 @@ select date_trunc('day', created_at at time zone 'America/Argentina/Buenos_Aires
        count(distinct actor_id) filter (where type = 'session.started') as activos,
        count(*) filter (where type = 'player.joined') as nuevos,
        count(*) filter (where type = 'construction.started') as construcciones,
-       count(*) filter (where type in ('construction.helped','public_work.contributed','lot.cared')) as jornadas_colectivas,
+       count(*) filter (where type in ('construction.helped','public_work.contributed','lot.cared','streets.maintained')) as jornadas_colectivas,
        count(*) filter (where type = 'gift.sent') as regalos
   from events group by 1 order by 1;
 ```

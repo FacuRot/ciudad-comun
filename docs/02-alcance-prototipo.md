@@ -10,11 +10,16 @@ Dos partes medibles: volver, y actuar sobre lo colectivo. Si vuelven pero solo m
 
 ## Se construye
 
+Ciudadanos, residencial y mantenimiento de calles se sumaron el 29/09/2026 (reglas en `05-reglas-y-parametros.md` §16 a §18). Lo que esas secciones no dicen —luminarias, mantenimiento de las obras, un segundo efecto de los ciudadanos— sigue afuera y está en `despues.md`.
+
 - **Una ciudad**, 75 lotes en dos barrios: Barrio 1 con 41 lotes abierto desde el inicio; Barrio 2 con 34 lotes que se abre a mitad de la prueba (ver `05-reglas-y-parametros.md` para la condición de apertura).
 - **Jornadas:** 3 por día, acumulables hasta 6. Sin excepciones, sin compra, sin bonus.
 - **Tres materiales:** ladrillo, madera, energía.
-- **Cuatro tipos de edificio**, tres niveles cada uno, dibujados con rectángulos de color: ladrillería, aserradero, generador y plaza.
+- **Cinco tipos de edificio**, tres niveles cada uno, dibujados con rectángulos de color: ladrillería, aserradero, generador, plaza y residencial.
 - **Obras públicas:** una por barrio (Escuela en Barrio 1, Hospital en Barrio 2), con barra de progreso y placa de contribuyentes.
+- **Ciudadanos por barrio:** gente que no juega y se muda una vez por día hacia capacidad × atractivo. No tocan la producción ni las jornadas de nadie; se ven caminando por las veredas y abren el Barrio 2 por una tercera vía (300 en el Barrio 1).
+- **Residencial:** aloja más ciudadanos y cobra un alquiler que depende del atractivo del barrio.
+- **Mantenimiento de calles:** un estado por barrio que se gasta solo y que sostienen los vecinos con jornada y ladrillo. Cuenta como jornada colectiva.
 - **Construcciones con hora real de finalización.** Ayudar a una construcción ajena la acorta.
 - **Lote con nombre y color** a elección.
 - **Decaimiento simplificado:** activo → descuidado → abandonado, con la acción de cuidar. Sin ruinas ni herencia (en tres semanas casi no ocurrirían).

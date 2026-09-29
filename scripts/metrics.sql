@@ -23,7 +23,7 @@ with base as (
    where not p.is_admin
      and exists (select 1 from events e
                   where e.actor_id = p.id
-                    and e.type in ('construction.started','public_work.contributed','construction.helped','lot.cared')
+                    and e.type in ('construction.started','public_work.contributed','construction.helped','lot.cared','streets.maintained')
                     and e.created_at < p.created_at + interval '1 day')
 )
 select count(*) as base_jugadores,
@@ -47,7 +47,7 @@ with base as (
    where not p.is_admin
      and exists (select 1 from events e
                   where e.actor_id = p.id
-                    and e.type in ('construction.started','public_work.contributed','construction.helped','lot.cared')
+                    and e.type in ('construction.started','public_work.contributed','construction.helped','lot.cared','streets.maintained')
                     and e.created_at < p.created_at + interval '1 day')
 )
 select x.d as dia, count(distinct b.id) as jugadores
@@ -65,15 +65,15 @@ with base as (
    where not p.is_admin
      and exists (select 1 from events e
                   where e.actor_id = p.id
-                    and e.type in ('construction.started','public_work.contributed','construction.helped','lot.cared')
+                    and e.type in ('construction.started','public_work.contributed','construction.helped','lot.cared','streets.maintained')
                     and e.created_at < p.created_at + interval '1 day')
 )
 select count(*) as jornadas_totales,
-       count(*) filter (where type in ('construction.helped','public_work.contributed','lot.cared')) as jornadas_colectivas,
-       round(count(*) filter (where type in ('construction.helped','public_work.contributed','lot.cared')) * 100.0
+       count(*) filter (where type in ('construction.helped','public_work.contributed','lot.cared','streets.maintained')) as jornadas_colectivas,
+       round(count(*) filter (where type in ('construction.helped','public_work.contributed','lot.cared','streets.maintained')) * 100.0
              / nullif(count(*), 0), 1) as jornadas_colectivas_pct
   from events
- where type in ('construction.started','construction.helped','public_work.contributed','lot.cared')
+ where type in ('construction.started','construction.helped','public_work.contributed','lot.cared','streets.maintained')
    and actor_id in (select id from base);
 
 -- H2 por jugador: quién sostiene lo colectivo y quién solo lo suyo.
@@ -81,7 +81,7 @@ select p.display_name,
        count(*) filter (where e.type <> 'construction.started') as colectivas,
        count(*) as totales
   from events e join players p on p.id = e.actor_id
- where e.type in ('construction.started','construction.helped','public_work.contributed','lot.cared')
+ where e.type in ('construction.started','construction.helped','public_work.contributed','lot.cared','streets.maintained')
  group by p.display_name
  order by colectivas desc, totales desc;
 
@@ -167,7 +167,7 @@ select date_trunc('day', e.created_at at time zone (select timezone from cities 
        count(*) filter (where e.type = 'player.joined')             as nuevos,
        count(*) filter (where e.type = 'construction.started')      as construcciones,
        count(*) filter (where e.type = 'construction.completed')    as terminadas,
-       count(*) filter (where e.type in ('construction.helped','public_work.contributed','lot.cared')) as jornadas_colectivas,
+       count(*) filter (where e.type in ('construction.helped','public_work.contributed','lot.cared','streets.maintained')) as jornadas_colectivas,
        count(*) filter (where e.type = 'gift.sent')                 as regalos,
        count(*) filter (where e.type = 'lot.visited')               as visitas
   from events e

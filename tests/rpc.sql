@@ -145,6 +145,8 @@ select pg_temp.ok((select count(*) = 1 from notifications_outbox where player_id
 -- ---------------------------------------------------------------------
 select pg_temp.ok((contribute(pg_temp.work('Escuela'), 0, 5, 0)).progress = '{"ladrillo":0,"madera":5,"energia":0,"jornadas":1}'::jsonb,
                   'contribute suma materiales y 1 jornada de obra');
+select pg_temp.ok(exists (select 1 from events where type = 'public_work.contributed' and payload @> '{"madera": 5, "jornadas": 1}'),
+                  'el evento dice cuántas jornadas de obra sumó');
 select pg_temp.err($$select contribute(pg_temp.work('Escuela'), -1, 0, 0)$$, 'BAD_AMOUNT');
 select pg_temp.err($$select contribute(pg_temp.work('Escuela'), 0, 0, 100)$$, 'NO_MATERIALS');
 select pg_temp.err($$select contribute(gen_random_uuid(), 0, 0, 0)$$, 'NO_WORK');
@@ -321,6 +323,20 @@ select pg_temp.ok((select count(*) = 1 from events where type = 'barrio.opened')
 select pg_temp.ok((select payload->>'reason' = 'time' from events where type = 'barrio.opened'), 'la razón de la apertura es el tiempo');
 select pg_temp.ok((select (population, streets_state, streets_updated_at) = (0, 100::numeric, now()) from barrios where ordinal = 2),
                   'al abrirse, el barrio arranca sin población y con las calles en 100 y el reloj en marcha');
+
+-- ---------------------------------------------------------------------
+-- Obra con las jornadas completas y materiales pendientes
+-- ---------------------------------------------------------------------
+update public_works set progress = '{"ladrillo":500,"madera":200,"energia":100,"jornadas":90}' where name = 'Escuela';
+select pg_temp.err($$select contribute(pg_temp.work('Escuela'), 0, 0, 0)$$, 'WORK_NEEDS_MATERIALS');
+select pg_temp.err($$select contribute(pg_temp.work('Escuela'), 10, 0, 0)$$, 'WORK_NEEDS_MATERIALS');
+select pg_temp.ok((contribute(pg_temp.work('Escuela'), 0, 0, 5)).progress = '{"ladrillo":500,"madera":200,"energia":105,"jornadas":90}'::jsonb,
+                  'con las jornadas completas, el aporte suma materiales y el contador no pasa del objetivo');
+select pg_temp.ok((select (p.jornadas, i.energia) = (4, 122) from players p join inventories i on i.player_id = p.id
+                    where p.id = '11111111-1111-1111-1111-111111111111'),
+                  'ese aporte igual cuesta 1 jornada');
+select pg_temp.ok(exists (select 1 from events where type = 'public_work.contributed' and payload @> '{"energia": 5, "jornadas": 0}'),
+                  'el evento dice que no sumó jornada de obra');
 
 -- ---------------------------------------------------------------------
 -- Obra completa y bonus

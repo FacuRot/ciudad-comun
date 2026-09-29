@@ -296,7 +296,7 @@ begin
   -- Cualquier otro es un bug y sale con warning.
   known := array['NO_JORNADAS','NO_MATERIALS','ALREADY_BUILDING','MAX_LEVEL','NO_CONSTRUCTION',
                  'LOT_NOT_NEGLECTED','CARE_LIMIT','GIFT_TOO_SMALL','NO_WORK','TYPE_LOCKED',
-                 'STREETS_FULL','STREETS_DONE_TODAY'];
+                 'STREETS_FULL','STREETS_DONE_TODAY','WORK_NEEDS_MATERIALS'];
   for bot in select code, count(*) n from bot_errors group by code order by count(*) desc loop
     if bot.code = any(known) then
       raise notice 'Rechazo esperado % × %', bot.n, bot.code;

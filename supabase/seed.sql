@@ -14,8 +14,9 @@ begin
     "production": { "rate_by_level": { "1": 2, "2": 3, "3": 5 }, "accrual_cap_hours": 48,
                     "state_factor": { "activo": 1.0, "descuidado": 0.5, "abandonado": 0.0 },
                     "plaza_bonus": 0.10, "plaza_bonus_cap": 0.20, "public_work_bonus": 0.15 },
-    "buildings": { "types": ["ladrilleria","aserradero","generador","plaza"],
-                   "produces": { "ladrilleria": "ladrillo", "aserradero": "madera", "generador": "energia", "plaza": null },
+    "buildings": { "types": ["ladrilleria","aserradero","generador","plaza","residencial"],
+                   "produces": { "ladrilleria": "ladrillo", "aserradero": "madera", "generador": "energia",
+                                 "plaza": null, "residencial": null },
                    "levels": { "1": { "cost": { "ladrillo": 15, "madera": 10, "energia": 0 },  "hours": 2 },
                                "2": { "cost": { "ladrillo": 30, "madera": 25, "energia": 15 }, "hours": 3 },
                                "3": { "cost": { "ladrillo": 60, "madera": 50, "energia": 40 }, "hours": 6 } } },
@@ -24,9 +25,13 @@ begin
     "decay": { "descuidado_after_days": 4, "abandonado_after_days": 8 },
     "gift": { "min_amount": 5 },
     "lots": { "max_claim_distance": 2 },
-    "barrio": { "open_threshold": 0.85, "open_after_days": 10 },
+    "barrio": { "open_threshold": 0.85, "open_after_days": 10, "open_population": 300 },
     "summary": { "min_hours_away": 2 },
-    "palette": ["terracota","ocre","oliva","teal","azul","lila","rosa","gris"]
+    "palette": ["terracota","ocre","oliva","teal","azul","lila","rosa","gris"],
+    "citizens": { "capacity_per_lot": 10, "consumption_per_day": 2,
+                  "weights": { "lotes": 0.3, "calles": 0.3, "abastecimiento": 0.3, "obra": 0.1 },
+                  "arrival_rate": 0.30, "departure_rate": 0.15 },
+    "residential": { "capacity_by_level": { "1": 30, "2": 60, "3": 100 } }
   }$j$::jsonb;
 
   insert into cities(name, config) values ('Ciudad Común · Cohorte 1', cfg) returning id into cid;

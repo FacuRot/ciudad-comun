@@ -27,6 +27,14 @@ Una fila en el prototipo. `config` (JSONB) contiene todos los parámetros de `05
 ### `barrios`
 Dos filas. `status` es `cerrado` o `abierto`. Al abrirse, sus lotes pasan de `cerrado` a `libre`.
 
+Ciudadanos y calles (`05-reglas-y-parametros.md` §16 y §18) viven en tres columnas, sin tabla aparte:
+
+- `population`: ciudadanos del barrio (entero ≥ 0). Solo la cambia `job_update_population`, una vez por día.
+- `streets_state`: estado de las calles guardado la última vez que se actualizó (0 a 100, con decimales).
+- `streets_updated_at`: cuándo se guardó `streets_state`. El estado de ahora se calcula al leer: `streets_state − desgaste × días desde streets_updated_at`, sin bajar de 0 (`fx_streets_state`). Es NULL mientras el barrio está cerrado: sus calles no se gastan. Al abrirse, `streets_state` vuelve al inicial y el reloj arranca.
+
+El atractivo y la capacidad no se guardan: se calculan cuando se usan, igual en el servidor (`fx_barrio_attractiveness`, `fx_barrio_capacity`) que en el cliente (`web/src/game/citizens.ts`).
+
 ### `lots`
 Un lote por celda construible. Campos clave:
 
@@ -34,7 +42,8 @@ Un lote por celda construible. Campos clave:
 - `status`: `cerrado` (barrio no abierto), `libre`, `ocupado`.
 - `owner_id`: jugador dueño; NULL si libre.
 - `name`, `color`: elegidos por el dueño. `name` único por ciudad.
-- `building_type`, `level`: NULL/0 hasta construir el nivel 1. `level` sube solo al completarse una construcción.
+- `building_type`, `level`: NULL/0 hasta construir el nivel 1. `level` sube solo al completarse una construcción. Cinco tipos: `ladrilleria`, `aserradero`, `generador`, `plaza`, `residencial`.
+- `rent_material`: material del alquiler, solo en residenciales (`05` §17.1). Lo fija `build` al iniciar el nivel 1 y no cambia; NULL en los demás tipos.
 - `state`: `activo`, `descuidado`, `abandonado`. Lo recalcula el cron diario y `heartbeat()` al entrar el dueño.
 - `production_collected_at`: desde cuándo hay producción sin recoger. Se usa para el cálculo perezoso.
 - `care_days`, `care_count`: días de gracia acumulados y cantidad de cuidados en la ausencia actual. Se reinician cuando el dueño vuelve.
@@ -73,7 +82,7 @@ La tabla más importante para el experimento. Una fila por acción relevante:
 | `player.joined` | nuevo | su lote | invitador | `{display_name}` |
 | `lot.claimed` | dueño | lote | — | `{name, color}` |
 | `lot.renamed` / `lot.recolored` | dueño | lote | — | `{name}` / `{color}` |
-| `construction.started` | dueño | lote | — | `{building_type, target_level, ends_at}` |
+| `construction.started` | dueño | lote | — | `{building_type, target_level, ends_at}` · más `rent_material` si es un residencial |
 | `construction.helped` | ayudante | lote | dueño | `{construction_id, new_ends_at}` |
 | `construction.completed` | — (sistema) | lote | dueño | `{building_type, level}` |
 | `public_work.contributed` | aportante | — | — | `{public_work_id, ladrillo, madera, energia}` |
@@ -82,10 +91,12 @@ La tabla más importante para el experimento. Una fila por acción relevante:
 | `gift.sent` | emisor | — | receptor | `{material, amount}` |
 | `lot.visited` | visitante | lote | dueño | `{}` |
 | `lot.state_changed` | — | lote | dueño | `{from, to}` |
-| `barrio.opened` | — | — | — | `{barrio_id, name, reason}` |
-| `production.collected` | dueño | lote | — | `{material, amount}` |
+| `barrio.opened` | — | — | — | `{barrio_id, name, reason}` · `reason`: `population`, `threshold`, `time` o `admin` |
+| `production.collected` | dueño | lote | — | `{material, amount}` · más `attractiveness` si es el alquiler de un residencial |
 | `session.started` | jugador | — | — | `{hours_away}` |
 | `jornadas.refilled` | — (sistema) | — | — | `{day}` · una por ciudad por día del juego; hace idempotente a `job_refill_jornadas` |
+| `streets.maintained` | quien mantuvo | — | — | `{barrio_id, points, state}` · `points`: los que sumó de verdad (menos de 4 cerca del tope); `state`: el estado después |
+| `barrio.population_changed` | — (sistema) | — | — | `{barrio_id, day, from, to, target, capacity, attractiveness, factors, main_reason}` · una por barrio abierto por día del juego; hace idempotente a `job_update_population`. `factors`: `{lotes, calles, abastecimiento, obra}`; `main_reason`: una de esas claves, o null |
 
 Índices por `(city_id, created_at)`, `(target_player_id, created_at)` y `(actor_id, created_at)`. De acá salen el resumen, la placa, las visitas y todas las métricas.
 
@@ -95,7 +106,7 @@ Lo que el sistema *querría* notificar (construcción terminada, vecino nuevo, r
 ## Funciones RPC (contrato en `06-acciones-y-api.md`)
 
 Públicas (llamadas desde el cliente, `SECURITY DEFINER`, validan `auth.uid()`):
-`claim_lot`, `rename_lot`, `recolor_lot`, `build`, `help_construction`, `contribute`, `care_lot`, `gift`, `visit_lot`, `heartbeat`, `get_summary`, `create_invitation`.
+`claim_lot`, `rename_lot`, `recolor_lot`, `build`, `help_construction`, `contribute`, `care_lot`, `maintain_streets`, `gift`, `visit_lot`, `heartbeat`, `get_summary`, `create_invitation`.
 
 Públicas para `anon` (pantalla de entrada, antes de tener jugador): `invitation_info`, `invitation_map`.
 
@@ -103,7 +114,7 @@ Administración (verifican `players.is_admin`):
 `admin_open_barrio`, `admin_city_stats`, `admin_pending_notifications`, `admin_mark_notified`, `admin_invitations`.
 
 Internas (no expuestas, usadas por las anteriores y por cron):
-`fx_config`, `fx_collect_production`, `fx_effective_rate`, `fx_lot_state`, `fx_log_event`, `job_refill_jornadas`, `job_update_lot_states`, `job_complete_constructions`, `job_check_barrio_opening`.
+`fx_config`, `fx_collect_production`, `fx_lot_rate` (tasa de `05` §3), `fx_effective_rate` (la anterior, por el atractivo si es residencial), `fx_lot_state`, `fx_log_event`, `fx_streets_state`, `fx_barrio_capacity`, `fx_barrio_attractiveness`, `job_refill_jornadas`, `job_update_lot_states`, `job_update_population`, `job_complete_constructions`, `job_check_barrio_opening`.
 
 ## Seguridad (RLS)
 

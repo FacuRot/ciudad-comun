@@ -4,12 +4,14 @@
 import { useState, type ReactNode } from 'react';
 import { useCity } from '../store/city';
 import { workAmounts, workPercent } from '../game/geo';
-import { BUILDING_LABEL, MATERIAL_LABEL, plural } from '../game/format';
-import type { BuildingType, GameEvent, Material, PublicWork, WorkAmounts } from '../types/game';
+import { BUILDING_LABEL, MATERIAL_LABEL, formatPercent, plural, reasonText } from '../game/format';
+import type { FactorKey } from '../game/citizens';
+import type { BuildingType, GameEvent, MapBarrio, Material, PublicWork, WorkAmounts } from '../types/game';
 
 const MAX_LINES = 8;
 
-export type Collected = { material?: Material; amount?: number };
+// Lo que recogió heartbeat al entrar. Con attractiveness si fue el alquiler de un residencial.
+export type Collected = { material?: Material; amount?: number; attractiveness?: number };
 
 export function SummaryModal({
   events,
@@ -22,7 +24,7 @@ export function SummaryModal({
 }) {
   const snapshot = useCity((s) => s.snapshot)!;
   const [expanded, setExpanded] = useState(false);
-  const lines = buildLines(events, collected, snapshot.players, snapshot.works);
+  const lines = buildLines(events, collected, snapshot.players, snapshot.works, snapshot.barrios);
 
   // Si no pasó nada mientras no estaba, no hay nada que contar.
   if (lines.length === 0) return null;
@@ -62,6 +64,7 @@ function buildLines(
   collected: Collected,
   players: Player[],
   works: PublicWork[],
+  barrios: MapBarrio[],
 ): Line[] {
   const names = new Map(players.map((p) => [p.id, p.display_name]));
   const nameOf = (id: string | null) => names.get(id ?? '') ?? 'Alguien';
@@ -163,7 +166,68 @@ function buildLines(
     });
   }
 
-  // 7. Vecinos nuevos cerca.
+  // 7. Ciudadanos del barrio propio: cuántos llegaron y cuántos se fueron en toda la ausencia,
+  // con lo que más restaba el último día. Si no se movió nadie, no es noticia.
+  const population = of('barrio.population_changed');
+  let arrived = 0;
+  let left = 0;
+  for (const e of population) {
+    const change = Number(payload(e).to) - Number(payload(e).from);
+    if (change > 0) arrived += change;
+    else left -= change;
+  }
+  if (arrived > 0 || left > 0) {
+    const last = payload(population[population.length - 1]);
+    const barrio = barrios.find((b) => b.id === last.barrio_id);
+    const work = works.find((w) => w.barrio_id === last.barrio_id);
+    const reason = (last.main_reason ?? null) as FactorKey | null;
+    lines.push({
+      key: 'citizens',
+      node: (
+        <>
+          Ciudadanos del <strong>{barrio?.name ?? 'barrio'}</strong>:{' '}
+          {arrived > 0 && (
+            <>
+              {arrived === 1 ? 'llegó' : 'llegaron'} <strong>{arrived}</strong>
+            </>
+          )}
+          {arrived > 0 && left > 0 && ', '}
+          {left > 0 && (
+            <>
+              {left === 1 ? 'se fue' : 'se fueron'} <strong>{left}</strong>
+            </>
+          )}
+          .
+          {reason && (
+            <>
+              {' '}
+              Lo que más resta: <strong>{reasonText(reason, work?.name)}</strong>.
+            </>
+          )}
+        </>
+      ),
+    });
+  }
+
+  // 7. Al dueño de un residencial, cuánto rindió el alquiler: el atractivo con que se cobró.
+  // Reemplaza a "Recogiste" (línea 10).
+  const rent = collected.attractiveness !== undefined;
+  if (rent && collected.material && collected.amount) {
+    lines.push({
+      key: 'rent',
+      node: (
+        <>
+          Tu <strong>residencial</strong> rindió al <strong>{formatPercent(Math.round(collected.attractiveness! * 100) / 100)}</strong>: cobraste{' '}
+          <strong>
+            {collected.amount} de {MATERIAL_LABEL[collected.material]}
+          </strong>
+          .
+        </>
+      ),
+    });
+  }
+
+  // 8. Vecinos nuevos cerca.
   const newcomers = unique(of('player.joined').map((e) => String(payload(e).display_name ?? nameOf(e.actor_id))));
   if (newcomers.length > 0) {
     lines.push({
@@ -176,7 +240,7 @@ function buildLines(
     });
   }
 
-  // 8. Visitas recibidas.
+  // 9. Visitas recibidas.
   const visitors = unique(of('lot.visited').map((e) => e.actor_id ?? ''));
   if (visitors.length > 0) {
     lines.push({
@@ -189,8 +253,8 @@ function buildLines(
     });
   }
 
-  // 9. Lo que se recogió al entrar.
-  if (collected.material && collected.amount) {
+  // 10. Lo que se recogió al entrar (el alquiler ya va en la línea 7).
+  if (!rent && collected.material && collected.amount) {
     lines.push({
       key: 'collected',
       node: (

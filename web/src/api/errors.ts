@@ -24,6 +24,7 @@ const MESSAGES: Record<string, string> = {
   LOT_NOT_NEGLECTED: 'Este lote está bien cuidado.',
   CARE_LIMIT: 'Este lote ya recibió todos los cuidados posibles.',
   GIFT_TOO_SMALL: 'El regalo mínimo es de 5 unidades.',
+  RENT_MATERIAL: 'Elegí qué material vas a cobrar de alquiler.',
   BAD_AMOUNT: 'Las cantidades no pueden ser negativas.',
   NOT_ADMIN: 'Esto es solo para el equipo.',
   // De la entrada con contraseña (ver authCodeOf).

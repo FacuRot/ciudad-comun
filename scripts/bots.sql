@@ -68,7 +68,7 @@ end $fn$;
 create or replace function pg_temp.act(p_bot uuid) returns void language plpgsql as $fn$
 declare
   cid uuid; mine lots; target lots; c constructions; w public_works; other players; inv inventories;
-  jornadas int; roll int; mat text; amount int;
+  jornadas int; roll int; mat text; amount int; kind building_t;
 begin
   perform pg_temp.as_bot(p_bot);
   select p.city_id, p.jornadas into cid, jornadas from players p where p.id = p_bot;
@@ -82,9 +82,12 @@ begin
     if jornadas < 1 then roll := 80 + floor(random() * 20)::int; end if;
 
     if roll < 30 then
-      -- Construir o mejorar. El tipo se elige una sola vez, en el nivel 1.
-      perform build(coalesce(mine.building_type,
-                             (array['ladrilleria','aserradero','generador','plaza'])[(1 + floor(random() * 4))::int]::building_t));
+      -- Construir o mejorar. El tipo se elige una sola vez, en el nivel 1, y el residencial
+      -- elige ahí también el material del alquiler.
+      kind := coalesce(mine.building_type,
+                       (array['ladrilleria','aserradero','generador','plaza','residencial'])[(1 + floor(random() * 5))::int]::building_t);
+      perform build(kind, case when kind = 'residencial' and mine.level = 0
+                               then (array['ladrillo','madera','energia'])[(1 + floor(random() * 3))::int]::material_t end);
 
     elsif roll < 50 then
       -- Ayudar la construcción de un vecino.

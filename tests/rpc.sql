@@ -50,6 +50,13 @@ create function pg_temp.lot(p_x int, p_y int) returns uuid language sql as $$
 create function pg_temp.work(p_name text) returns uuid language sql as $$
   select id from public_works where name = p_name $$;
 
+create function pg_temp.barrio(p_ordinal int) returns uuid language sql as $$
+  select id from barrios where ordinal = p_ordinal $$;
+
+-- El único evento de población que hay (las pruebas borran los anteriores antes de correr el job).
+create function pg_temp.population_event() returns jsonb language sql as $$
+  select payload from events where type = 'barrio.population_changed' $$;
+
 -- A, B y C van a tener lote. D es un usuario autenticado sin jugador.
 insert into auth.users(id, email) values
   ('11111111-1111-1111-1111-111111111111', 'a@test.local'),
@@ -247,16 +254,67 @@ select pg_temp.ok((select jornadas = 5 from players where id = '11111111-1111-11
 select pg_temp.ok((select jornadas = 6 from players where id = '22222222-2222-2222-2222-222222222222'), 'recarga respeta el tope de 6');
 
 -- ---------------------------------------------------------------------
+-- Ciudadanos (dos veces: idempotente)
+-- ---------------------------------------------------------------------
+-- En el Barrio 1 hay un solo edificio (el generador de A), los tres lotes están activos
+-- y la Escuela sigue en curso: atractivo 0,9 y el motivo es la obra.
+select pg_temp.ok(fx_barrio_capacity(pg_temp.barrio(1)) = 10, 'capacidad: 10 por lote con edificio');
+select pg_temp.ok(((fx_barrio_attractiveness(pg_temp.barrio(1)))->>'attractiveness')::numeric = 0.9
+                  and (fx_barrio_attractiveness(pg_temp.barrio(1)))->>'main_reason' = 'obra',
+                  'atractivo sin la obra terminada: 0,9, y lo que más resta es la obra');
+select pg_temp.ok(((fx_barrio_attractiveness(pg_temp.barrio(1)))->'factors'->>'abastecimiento')::numeric = 1,
+                  'con población 0 el abastecimiento vale 1');
+
+select job_update_population();
+select job_update_population();
+select pg_temp.ok((select population = 3 from barrios where ordinal = 1), 'llegan ceil(30 % de 9) = 3');
+select pg_temp.ok((select count(*) = 1 from events where type = 'barrio.population_changed'),
+                  'job_update_population es idempotente y no toca el barrio cerrado');
+select pg_temp.ok(pg_temp.population_event() @> '{"from": 0, "to": 3, "target": 9, "capacity": 10, "main_reason": "obra"}',
+                  'barrio.population_changed lleva antes, después, objetivo, capacidad y motivo');
+select pg_temp.ok(exists (select 1 from get_summary(now() - interval '1 day') where type = 'barrio.population_changed'),
+                  'get_summary trae la población del barrio propio');
+
+-- Con A descuidado el atractivo baja a 0,85: objetivo 8, y de 10 se va ceil(15 % de 2) = 1.
+-- Con open_population en 9, el mismo job abre el Barrio 2 por población.
+delete from events where type = 'barrio.population_changed';
+update barrios set population = 10 where ordinal = 1;
+update lots set state = 'descuidado' where x = 0 and y = 0;
+update cities set config = jsonb_set(config, '{barrio,open_population}', '9');
+select job_update_population();
+select pg_temp.ok((select population = 9 from barrios where ordinal = 1), 'se van ceil(15 % de 2) = 1');
+select pg_temp.ok(pg_temp.population_event() @> '{"target": 8, "factors": {"lotes": 0.8333}}'
+                  and (pg_temp.population_event()->>'attractiveness')::numeric = 0.85,
+                  'un lote descuidado baja el factor lotes a 0,8333 y el atractivo a 0,85');
+select pg_temp.ok((select payload->>'reason' = 'population' from events where type = 'barrio.opened'),
+                  'job_update_population abre el Barrio 2 al llegar a open_population');
+
+-- La población nunca pasa la capacidad.
+update lots set state = 'activo' where x = 0 and y = 0;
+update cities set config = jsonb_set(config, '{barrio,open_population}', '300');
+delete from events where type = 'barrio.population_changed';
+update barrios set population = 50 where ordinal = 1;
+select job_update_population();
+select pg_temp.ok((select population = 10 from barrios where ordinal = 1), 'la población se recorta a la capacidad');
+
+-- Vuelve el Barrio 2 a cerrado para probar la apertura por tiempo.
+delete from events where type in ('barrio.opened', 'barrio.population_changed');
+delete from notifications_outbox where type = 'barrio.opened';
+update barrios set status = 'cerrado', opened_at = null, population = 0 where ordinal = 2;
+update lots l set status = 'cerrado' from barrios b where b.id = l.barrio_id and b.ordinal = 2;
+
+-- ---------------------------------------------------------------------
 -- Apertura del Barrio 2 (dos veces: idempotente)
 -- ---------------------------------------------------------------------
 select job_check_barrio_opening();
-select pg_temp.ok((select status = 'cerrado' from barrios where ordinal = 2), 'Barrio 2 sigue cerrado (3/41 ocupados, día 0)');
+select pg_temp.ok((select status = 'cerrado' from barrios where ordinal = 2), 'Barrio 2 sigue cerrado (3/41 ocupados, día 0, 10 ciudadanos)');
 update cities set opened_at = now() - interval '11 days';
 select job_check_barrio_opening();
 select job_check_barrio_opening();
 select pg_temp.ok((select count(*) = 34 from lots l join barrios b on b.id = l.barrio_id where b.ordinal = 2 and l.status = 'libre'),
                   'apertura por tiempo: 34 lotes libres');
 select pg_temp.ok((select count(*) = 1 from events where type = 'barrio.opened'), 'job_check_barrio_opening es idempotente');
+select pg_temp.ok((select payload->>'reason' = 'time' from events where type = 'barrio.opened'), 'la razón de la apertura es el tiempo');
 
 -- ---------------------------------------------------------------------
 -- Obra completa y bonus
@@ -273,9 +331,61 @@ select pg_temp.err($$select contribute(pg_temp.work('Escuela'), 0, 0, 0)$$, 'NO_
 -- Plaza vecina: C construye una plaza en (0,1), pegada a A.
 select pg_temp.as_user('33333333-3333-3333-3333-333333333333');
 select build('plaza');
+select pg_temp.ok(fx_barrio_capacity(pg_temp.barrio(1)) = 10, 'una primera construcción en curso no aloja a nadie');
 update constructions set ends_at = now() - interval '1 minute' where completed_at is null;
 select job_complete_constructions();
 select pg_temp.ok((select fx_effective_rate(l) = 2.53 from lots l where x = 0 and y = 0), 'plaza adyacente: 2 × 1.10 × 1.15');
+select pg_temp.ok(fx_barrio_capacity(pg_temp.barrio(1)) = 20, 'la plaza también aloja 10');
+select pg_temp.ok((fx_barrio_attractiveness(pg_temp.barrio(1)))->>'main_reason' is null
+                  and ((fx_barrio_attractiveness(pg_temp.barrio(1)))->>'attractiveness')::numeric = 1,
+                  'con la Escuela terminada y todo en orden, atractivo 1 y ningún motivo');
+
+-- ---------------------------------------------------------------------
+-- Residencial y alquiler
+-- ---------------------------------------------------------------------
+-- B, en (1,0) y sin edificio, construye un residencial que cobra en madera.
+select pg_temp.as_user('22222222-2222-2222-2222-222222222222');
+update inventories set ladrillo = 100, madera = 100, energia = 100 where player_id = '22222222-2222-2222-2222-222222222222';
+select pg_temp.err($$select build('residencial')$$, 'RENT_MATERIAL');
+select pg_temp.err($$select build('generador', 'ladrillo')$$, 'RENT_MATERIAL');
+select build('residencial', 'madera');
+select pg_temp.ok((select rent_material = 'madera' from lots where x = 1 and y = 0),
+                  'build guarda el material del alquiler al iniciar el nivel 1');
+select pg_temp.ok((select payload @> '{"building_type": "residencial", "rent_material": "madera"}' from events
+                    where type = 'construction.started' and actor_id = '22222222-2222-2222-2222-222222222222'),
+                  'construction.started lleva el material del alquiler');
+select pg_temp.ok(fx_barrio_capacity(pg_temp.barrio(1)) = 20, 'un residencial en obra todavía no aloja a nadie');
+update constructions set ends_at = now() - interval '1 minute' where completed_at is null;
+select job_complete_constructions();
+select pg_temp.ok(fx_barrio_capacity(pg_temp.barrio(1)) = 50, 'el residencial nivel 1 aloja 30');
+
+-- Con 50 ciudadanos el barrio consume 100 por día y produce 2,53 × 24 = 60,72 (el alquiler no cuenta):
+-- abastecimiento 0,6072 y atractivo 0,3 + 0,3 + 0,3 × 0,6072 + 0,1 = 0,8822.
+update barrios set population = 50 where ordinal = 1;
+select pg_temp.ok((select fx_lot_rate(l) = 2.3 from lots l where x = 1 and y = 0), 'la tasa de §3 del residencial: 2 × 1.15');
+select pg_temp.ok(((fx_barrio_attractiveness(pg_temp.barrio(1)))->'factors'->>'abastecimiento')::numeric = 0.6072
+                  and ((fx_barrio_attractiveness(pg_temp.barrio(1)))->>'attractiveness')::numeric = 0.8822,
+                  'el alquiler no cuenta para el abastecimiento');
+select pg_temp.ok((select fx_effective_rate(l) = 2.3 * 0.8822 from lots l where x = 1 and y = 0),
+                  'el alquiler rinde la tasa de §3 por el atractivo');
+update lots set production_collected_at = now() - interval '10 hours' where x = 1 and y = 0;
+select pg_temp.ok((heartbeat())->'collected' = '{"material": "madera", "amount": 20, "attractiveness": 0.8822}'::jsonb,
+                  'el alquiler se cobra en el material elegido: 10 h × 2,03/h, con el atractivo');
+select pg_temp.ok((select madera = 110 from inventories where player_id = '22222222-2222-2222-2222-222222222222'),
+                  'el alquiler entra al inventario: 100 − 10 del nivel 1 + 20');
+select pg_temp.ok((select payload->>'attractiveness' = '0.8822' from events
+                    where type = 'production.collected' and actor_id = '22222222-2222-2222-2222-222222222222'),
+                  'production.collected del residencial lleva el atractivo');
+
+-- Mejoras: el material puede venir vacío o igual; distinto, no.
+select pg_temp.err($$select build('residencial', 'ladrillo')$$, 'RENT_MATERIAL');
+select build('residencial');
+select pg_temp.ok(fx_barrio_capacity(pg_temp.barrio(1)) = 50, 'durante la mejora cuenta el nivel anterior');
+update constructions set ends_at = now() - interval '1 minute' where completed_at is null;
+select job_complete_constructions();
+select pg_temp.ok(fx_barrio_capacity(pg_temp.barrio(1)) = 80
+                  and (select rent_material = 'madera' from lots where x = 1 and y = 0),
+                  'el residencial nivel 2 aloja 60 y sigue cobrando en madera');
 
 -- ---------------------------------------------------------------------
 -- Admin, invitaciones y NO_PLAYER
@@ -306,6 +416,8 @@ select pg_temp.ok(jsonb_array_length(admin_invitations()) = (select count(*) fro
 select set_config('test.token', create_invitation(), true);
 select pg_temp.ok((invitation_info(current_setting('test.token')))->>'inviter' = 'Facu', 'create_invitation + invitation_info');
 select pg_temp.ok(invitation_info('no-existe') is null, 'invitation_info de un token inexistente');
+select pg_temp.ok((invitation_map(current_setting('test.token')))->'barrios'->0 ? 'population',
+                  'invitation_map trae la población de cada barrio');
 
 select pg_temp.as_user('44444444-4444-4444-4444-444444444444');
 select pg_temp.err($$select heartbeat()$$, 'NO_PLAYER');

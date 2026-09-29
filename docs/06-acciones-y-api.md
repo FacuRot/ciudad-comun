@@ -33,6 +33,9 @@ Toda acción del jugador es una llamada `supabase.rpc('<función>', {...})`. Las
 | `LOT_NOT_NEGLECTED` | Cuidar un lote activo | "Este lote está bien cuidado." |
 | `CARE_LIMIT` | Máximo de cuidados | "Este lote ya recibió todos los cuidados posibles." |
 | `GIFT_TOO_SMALL` | Menos del mínimo | "El regalo mínimo es de 5 unidades." |
+| `RENT_MATERIAL` | Residencial sin material de alquiler, o material en otro tipo o distinto del que ya tiene | "Elegí qué material vas a cobrar de alquiler." |
+| `STREETS_FULL` | Mantener calles que ya están en 100 (o de un barrio cerrado) | "Las calles ya están al día." |
+| `STREETS_DONE_TODAY` | Ya mantuvo las calles de ese barrio hoy | "Hoy ya mantuviste estas calles. Mañana podés de nuevo." |
 | `NOT_ADMIN` | Sin permisos | — |
 | violación de PK en `construction_helps` | Ya ayudó esa construcción | "Ya ayudaste en esta obra." |
 
@@ -68,13 +71,18 @@ Registro completo en una transacción: valida invitación, crea `players` e `inv
 Precondiciones: usuario autenticado sin jugador; lote `libre` y a distancia ≤ 2 de un lote ocupado no abandonado (salvo ciudad vacía).
 
 ### `heartbeat()` → jsonb
-Se llama al abrir la app y cada vez que la pestaña vuelve a estar visible (`visibilitychange`). Recoge producción, actualiza `last_seen_at`, reactiva el lote si estaba descuidado o abandonado, y devuelve `{hours_away, since, collected, show_summary}`. Si `show_summary` es true, el cliente llama a `get_summary(since)`.
+Se llama al abrir la app y cada vez que la pestaña vuelve a estar visible (`visibilitychange`). Recoge producción, actualiza `last_seen_at`, reactiva el lote si estaba descuidado o abandonado, y devuelve `{hours_away, since, collected, show_summary}`. `collected` es `{material, amount}`, más `attractiveness` si lo recogido es el alquiler de un residencial (el resumen dice "rindió al 86 %" con ese número). Si `show_summary` es true, el cliente llama a `get_summary(since)`.
 
 ### `get_summary(p_since)` → events[]
-Eventos relevantes para el jugador desde `p_since`: los dirigidos a él, los de obras públicas y barrio, y los vecinos nuevos a distancia ≤ 2. El cliente los agrupa según el orden de prioridad de `05-reglas-y-parametros.md` §11.
+Eventos relevantes para el jugador desde `p_since`: los dirigidos a él, los de obras públicas y barrio, los `barrio.population_changed` de su barrio y los vecinos nuevos a distancia ≤ 2. El cliente los agrupa según el orden de prioridad de `05-reglas-y-parametros.md` §11.
 
-### `build(p_building_type)` → constructions
+### `build(p_building_type, p_rent_material default null)` → constructions
 Nivel 1: elige el tipo. Niveles 2 y 3: el tipo debe coincidir. Gasta 1 jornada y los materiales del nivel objetivo; crea la construcción con `ends_at`. Emite `construction.started`.
+
+`p_rent_material` es el material del alquiler (`05` §17.1). Obligatorio en el nivel 1 de un residencial, y se guarda en `lots.rent_material` en el acto. En las mejoras de un residencial puede venir vacío o igual al que tiene; en cualquier otro tipo tiene que venir vacío. Si no, `RENT_MATERIAL`.
+
+### `maintain_streets(p_barrio_id)` → barrios
+Mantener las calles de un barrio abierto, propio o ajeno (`05` §18). Calcula el estado de ahora con el desgaste perezoso; si redondeado ya es 100, `STREETS_FULL`. Si el jugador ya mantuvo ese barrio hoy (día del juego, contado en los eventos), `STREETS_DONE_TODAY`. Gasta 1 jornada y `streets.cost`, suma `streets.points` con tope de 100, guarda el estado y reinicia el reloj (`streets_updated_at = now()`). Emite `streets.maintained`. Un barrio inexistente o de otra ciudad es `OTHER_CITY`.
 
 ### `help_construction(p_construction_id)` → constructions
 Gasta 1 jornada, registra la ayuda (una por jugador por construcción), resta `help.hours_reduced` a `ends_at`. Si queda en el pasado, completa la construcción en el acto. Emite `construction.helped` y encola aviso al dueño.
@@ -129,6 +137,10 @@ sb.from('public_work_contributions').select('player_id, players(display_name)').
 // lee los eventos lot.visited, que sí son legibles dentro de la ciudad.
 sb.from('events').select('actor_id, created_at').eq('type', 'lot.visited').eq('lot_id', id);
 
+// Quién mantuvo las calles de un barrio en los últimos 7 días.
+sb.from('events').select('actor_id, created_at').eq('type', 'streets.maintained')
+  .eq('payload->>barrio_id', id).gte('created_at', hace7dias);
+
 // Realtime
 sb.channel('city')
   .on('postgres_changes', { event: '*', schema: 'public', table: 'lots' }, applyLot)
@@ -141,15 +153,15 @@ sb.channel('city')
 
 Fallback: si el canal no llega a `SUBSCRIBED` en 5 segundos o se cae, `setInterval` de 30 segundos que repite la carga inicial.
 
-El toast de `events` solo puede filtrar por `target_player_id`, así que la obra completada y el barrio abierto —que no apuntan a nadie— se avisan mirando la fila que cambió en `public_works` y `barrios`, que ya llega por su propio canal.
+El toast de `events` solo puede filtrar por `target_player_id`, así que la obra completada y el barrio abierto —que no apuntan a nadie— se avisan mirando la fila que cambió en `public_works` y `barrios`, que ya llega por su propio canal. Por ese mismo canal de `barrios` llegan la población del día y el estado de calles guardado; el desgaste de ahí en adelante lo calcula el cliente con la misma cuenta que `fx_streets_state`.
 
 ## Wrappers tipados en el cliente
 
 Un archivo `web/src/api/actions.ts` con una función por RPC, que traduce el código de error a un mensaje y actualiza el store con la fila devuelta:
 
 ```ts
-export async function build(type: BuildingType) {
-  const { data, error } = await sb.rpc('build', { p_building_type: type });
+export async function build(type: BuildingType, rentMaterial?: Material) {
+  const { data, error } = await sb.rpc('build', { p_building_type: type, p_rent_material: rentMaterial });
   if (error) throw new GameError(codeOf(error));
   store.getState().applyConstruction(data);
   return data;

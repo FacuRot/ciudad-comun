@@ -26,6 +26,7 @@ const BUILDING: Record<string, string> = {
   aserradero: 'aserradero',
   generador: 'generador',
   plaza: 'plaza',
+  residencial: 'residencial',
 };
 
 // Una línea por aviso. Si aparece un tipo nuevo sin plantilla, se saltea.

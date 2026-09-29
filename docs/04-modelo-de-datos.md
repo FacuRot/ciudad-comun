@@ -63,7 +63,7 @@ Una por mejora en curso o terminada. `target_level`, `building_type`, `started_a
 Quién ayudó qué construcción. `UNIQUE (construction_id, helper_id)` implementa el máximo de una ayuda por jugador.
 
 ### `public_works`
-Una por barrio. `cost` y `progress` son JSONB con las cuatro claves (`ladrillo`, `madera`, `energia`, `jornadas`). `status`: `en_curso` o `completada`. Se completa cuando `progress >= cost` en las cuatro claves.
+Una por barrio. `cost` y `progress` son JSONB con las cuatro claves (`ladrillo`, `madera`, `energia`, `jornadas`). `status`: `en_curso` o `completada`. Se completa cuando `progress >= cost` en las cuatro claves. `progress` nunca pasa de `cost`: los aportes se recortan a lo que falta, también la jornada de obra.
 
 ### `public_work_contributions`
 Un aporte = una jornada. Guarda los materiales entregados. La placa se arma con `GROUP BY player_id ORDER BY COUNT(*) DESC`.
@@ -85,7 +85,7 @@ La tabla más importante para el experimento. Una fila por acción relevante:
 | `construction.started` | dueño | lote | — | `{building_type, target_level, ends_at}` · más `rent_material` si es un residencial |
 | `construction.helped` | ayudante | lote | dueño | `{construction_id, new_ends_at}` |
 | `construction.completed` | — (sistema) | lote | dueño | `{building_type, level}` |
-| `public_work.contributed` | aportante | — | — | `{public_work_id, ladrillo, madera, energia}` |
+| `public_work.contributed` | aportante | — | — | `{public_work_id, ladrillo, madera, energia, jornadas}` (`jornadas`: 1, o 0 si la obra ya las tenía completas; el aporte igual costó 1 jornada) |
 | `public_work.completed` | — | — | — | `{public_work_id, name}` |
 | `lot.cared` | cuidador | lote | dueño | `{care_count}` |
 | `gift.sent` | emisor | — | receptor | `{material, amount}` |

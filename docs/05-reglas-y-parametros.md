@@ -116,8 +116,9 @@ Una por barrio. Nadie las inicia: existen desde el seed con progreso cero y se v
 
 ### Aportar
 
-- Cuesta **1 jornada por aporte**. El aporte puede llevar cualquier cantidad de materiales (incluso cero: la jornada sola cuenta como "jornada de obra").
-- Cada aporte suma 1 al contador de jornadas de la obra y los materiales entregados a cada contador. Un aporte no puede entregar más de lo que falta de cada material.
+- Cuesta **1 jornada por aporte**. Mientras a la obra le falten jornadas, el aporte puede llevar cualquier cantidad de materiales (incluso cero: la jornada sola cuenta como "jornada de obra").
+- Cada aporte suma 1 al contador de jornadas de la obra, hasta el objetivo, y los materiales entregados a cada contador. Un aporte no puede entregar más de lo que falta de cada material, ni el contador de jornadas pasa del objetivo.
+- Con las jornadas completas, la jornada sola ya no suma: el aporte tiene que llevar al menos una unidad de algún material que falte. Si no lleva ninguno, se rechaza y no cuesta la jornada. Si lleva, cuesta 1 jornada como siempre.
 - Se puede aportar a la obra de cualquier barrio de la ciudad, no solo al propio.
 - La obra se completa cuando los cuatro contadores llegan a su objetivo. Al completarse: evento `public_work.completed` para toda la ciudad, la placa queda fija con todos los contribuyentes ordenados por cantidad de aportes, y se activa el bonus.
 

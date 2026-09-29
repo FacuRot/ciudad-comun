@@ -30,6 +30,7 @@ Toda acción del jugador es una llamada `supabase.rpc('<función>', {...})`. Las
 | `OWN_CONSTRUCTION` / `OWN_LOT` / `SELF_GIFT` | Acción sobre uno mismo | "Esto es para ayudar a otros." |
 | `OTHER_CITY` | Objeto de otra ciudad | (no debería ocurrir) |
 | `NO_WORK` | Obra pública inexistente o completada | "Esa obra ya está terminada." |
+| `WORK_NEEDS_MATERIALS` | Aporte sin ningún material que falte a una obra con las jornadas completas | "La obra ya tiene todas sus jornadas: ahora faltan materiales." |
 | `LOT_NOT_NEGLECTED` | Cuidar un lote activo | "Este lote está bien cuidado." |
 | `CARE_LIMIT` | Máximo de cuidados | "Este lote ya recibió todos los cuidados posibles." |
 | `GIFT_TOO_SMALL` | Menos del mínimo | "El regalo mínimo es de 5 unidades." |
@@ -88,7 +89,7 @@ Mantener las calles de un barrio abierto, propio o ajeno (`05` §18). Calcula el
 Gasta 1 jornada, registra la ayuda (una por jugador por construcción), resta `help.hours_reduced` a `ends_at`. Si queda en el pasado, completa la construcción en el acto. Emite `construction.helped` y encola aviso al dueño.
 
 ### `contribute(p_public_work_id, p_l, p_m, p_e)` → public_works
-Gasta 1 jornada y los materiales indicados (recortados a lo que falta). Suma al progreso. Si se completa: `status = completada`, evento `public_work.completed`, aviso a toda la ciudad. Emite `public_work.contributed`.
+Gasta 1 jornada y los materiales indicados (recortados a lo que falta). Suma al progreso: los materiales entregados y 1 jornada de obra, salvo que las jornadas ya estén en el objetivo (el contador no lo pasa). Con las jornadas completas, si después del recorte no queda ningún material, `WORK_NEEDS_MATERIALS` sin gastar nada (`05` §5). Si se completa: `status = completada`, evento `public_work.completed`, aviso a toda la ciudad. Emite `public_work.contributed` con las jornadas de obra que sumó (1 o 0).
 
 ### `care_lot(p_lot_id)` → lots
 Solo sobre lotes ajenos en estado `descuidado` o `abandonado` y con menos de `care.max_per_absence` cuidados. Gasta 1 jornada, suma `care.days_added` a `care_days`, recalcula el estado. Emite `lot.cared`, encola aviso al dueño.

@@ -33,7 +33,7 @@ begin perform set_config('request.jwt.claim.sub', coalesce(p::text, ''), true); 
 create or replace function pg_temp.advance(p interval) returns void language plpgsql as $fn$
 begin
   update cities    set opened_at = opened_at - p;
-  update barrios   set opened_at = opened_at - p where opened_at is not null;
+  update barrios   set opened_at = opened_at - p, streets_updated_at = streets_updated_at - p where opened_at is not null;
   update players   set created_at = created_at - p, last_seen_at = last_seen_at - p;
   update lots      set claimed_at = claimed_at - p, production_collected_at = production_collected_at - p;
   update constructions set started_at = started_at - p, ends_at = ends_at - p, completed_at = completed_at - p;
@@ -96,7 +96,7 @@ begin
        order by random() limit 1;
       if c.id is not null then perform help_construction(c.id); end if;
 
-    elsif roll < 72 then
+    elsif roll < 64 then
       -- Aportar a la obra, con preferencia por la del propio barrio.
       select * into w from public_works
        where city_id = cid and status = 'en_curso'
@@ -107,6 +107,10 @@ begin
                            floor(inv.madera   * random() * 0.6)::int,
                            floor(inv.energia  * random() * 0.6)::int);
       end if;
+
+    elsif roll < 72 then
+      -- Mantener las calles del propio barrio (a veces ya están al día, o ya las mantuvo hoy).
+      perform maintain_streets(mine.barrio_id);
 
     elsif roll < 80 then
       -- Cuidar el lote de alguien que no viene.
@@ -248,10 +252,14 @@ begin
     (select coalesce(string_agg(building_type::text || ' ' || n, ' · '), 'ninguno')
        from (select building_type, count(*) n from lots where level > 0 group by building_type order by building_type) s);
   raise notice 'Jornadas gastadas: % · colectivas: % %%',
-    (select count(*) from events where type in ('construction.started','construction.helped','public_work.contributed','lot.cared')),
-    (select round(count(*) filter (where type in ('construction.helped','public_work.contributed','lot.cared')) * 100.0
+    (select count(*) from events where type in ('construction.started','construction.helped','public_work.contributed','lot.cared','streets.maintained')),
+    (select round(count(*) filter (where type in ('construction.helped','public_work.contributed','lot.cared','streets.maintained')) * 100.0
                   / nullif(count(*), 0))
-       from events where type in ('construction.started','construction.helped','public_work.contributed','lot.cared'));
+       from events where type in ('construction.started','construction.helped','public_work.contributed','lot.cared','streets.maintained'));
+  raise notice 'Calles: % · mantenimientos: % de % jugadores distintos',
+    (select string_agg(name || ' ' || round(fx_streets_state(id)), ' · ' order by ordinal) from barrios where status = 'abierto'),
+    (select count(*) from events where type = 'streets.maintained'),
+    (select count(distinct actor_id) from events where type = 'streets.maintained');
   raise notice 'Regalos: % (% unidades) · cuidados: % · visitas: %',
     (select count(*) from gifts), (select coalesce(sum(amount), 0) from gifts),
     (select count(*) from lot_cares), (select count(*) from events where type = 'lot.visited');
@@ -267,7 +275,8 @@ begin
   -- Los errores esperados son parte del juego (te quedaste sin jornadas).
   -- Cualquier otro es un bug y sale con warning.
   known := array['NO_JORNADAS','NO_MATERIALS','ALREADY_BUILDING','MAX_LEVEL','NO_CONSTRUCTION',
-                 'LOT_NOT_NEGLECTED','CARE_LIMIT','GIFT_TOO_SMALL','NO_WORK','TYPE_LOCKED'];
+                 'LOT_NOT_NEGLECTED','CARE_LIMIT','GIFT_TOO_SMALL','NO_WORK','TYPE_LOCKED',
+                 'STREETS_FULL','STREETS_DONE_TODAY'];
   for bot in select code, count(*) n from bot_errors group by code order by count(*) desc loop
     if bot.code = any(known) then
       raise notice 'Rechazo esperado % × %', bot.n, bot.code;

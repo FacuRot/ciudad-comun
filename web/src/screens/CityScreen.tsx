@@ -12,6 +12,7 @@ import { OtherLotPanel } from '../panels/OtherLotPanel';
 import { WorkPanel } from '../panels/WorkPanel';
 import { BarrioPanel } from '../panels/BarrioPanel';
 import { SummaryModal, type Collected } from '../panels/SummaryModal';
+import { streetsState } from '../game/streets';
 import { InviteModal } from '../panels/InviteModal';
 import { Toasts } from '../panels/Toasts';
 import { gridSize, workPercent, type Cell } from '../game/geo';
@@ -110,11 +111,14 @@ function CityScreen() {
       .filter(Boolean)
       .join(' · ');
 
+    // El estado de las calles de ahora, para dibujarlas (docs/05 §18). Se recalcula con cada
+    // cambio de la ciudad: el desgaste es lento y solo se ve al cruzar un rango.
+    const cfg = configOf(city);
     const scene: Scene = {
       ...gridSize(lots, works),
       lots,
       works,
-      barrios,
+      barrios: barrios.map((b) => ({ ...b, streets: streetsState(b, cfg) })),
       constructions,
       timezone: city.timezone,
       myLotId: myLot?.id,
@@ -122,7 +126,7 @@ function CityScreen() {
       selectedWorkId: selection.kind === 'work' ? selection.id : null,
     };
 
-    return { scene, tooltip, click, footer, myLot, barrio, cap: configOf(city).jornadas.cap };
+    return { scene, tooltip, click, footer, myLot, barrio, cap: cfg.jornadas.cap };
   }, [snapshot, me.id, selection]);
 
   if (error) return <Notice>{error}</Notice>;

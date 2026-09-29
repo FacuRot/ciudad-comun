@@ -2,6 +2,7 @@
 // cuenta que fx_barrio_capacity y fx_barrio_attractiveness. Solo sirve para mostrar:
 // la población la mueve el servidor una vez por día.
 import { lotRate } from './production';
+import { streetsState } from './streets';
 import type { Barrio, CityConfig, Lot, PublicWork } from '../types/game';
 
 export type FactorKey = 'lotes' | 'calles' | 'abastecimiento' | 'obra';
@@ -55,7 +56,9 @@ export function barrioAttractiveness(barrio: Barrio, lots: Lot[], works: PublicW
 
   const obra = works.some((w) => w.barrio_id === barrio.id && w.status === 'en_curso') ? 0 : 1;
 
-  const factors: Factors = { lotes: round4(lotes), calles: 1, abastecimiento: round4(abastecimiento), obra };
+  const calles = streetsState(barrio, cfg) / 100;
+
+  const factors: Factors = { lotes: round4(lotes), calles: round4(calles), abastecimiento: round4(abastecimiento), obra };
   const weights = cfg.citizens.weights;
   let total = 0;
   let weightSum = 0;

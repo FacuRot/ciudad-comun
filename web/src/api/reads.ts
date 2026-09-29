@@ -67,6 +67,23 @@ export async function loadVisits(lotId: string, days: number): Promise<{ actor_i
   );
 }
 
+// Quién mantuvo las calles de un barrio en los últimos días (docs/06), de los eventos.
+export async function loadStreetMaintenance(
+  barrioId: string,
+  days: number,
+): Promise<{ actor_id: string | null; created_at: string }[]> {
+  const since = new Date(Date.now() - days * 24 * 3600 * 1000).toISOString();
+  return unwrap(
+    await sb
+      .from('events')
+      .select('actor_id, created_at')
+      .eq('type', 'streets.maintained')
+      .eq('payload->>barrio_id', barrioId)
+      .gte('created_at', since)
+      .order('created_at', { ascending: false }),
+  );
+}
+
 export async function loadMe(uid: string): Promise<{ me: Player | null; inventory: Inventory | null }> {
   const [me, inventory] = await Promise.all([
     sb.from('players').select('*').eq('id', uid).maybeSingle(),

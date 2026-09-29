@@ -1,9 +1,14 @@
 // Panel de barrio (docs/07-pantallas-y-flujos.md): qué se produce, qué edificios hay y qué falta,
-// y lo colectivo: sus ciudadanos (docs/05 §16).
+// y lo colectivo: sus ciudadanos y sus calles (docs/05 §16 y §18).
+import { useEffect, useState } from 'react';
+import { maintainStreets } from '../api/actions';
+import { GameError, messageOf } from '../api/errors';
+import { loadStreetMaintenance } from '../api/reads';
 import { useCity } from '../store/city';
 import { workPercent } from '../game/geo';
 import { effectiveRate, scarceMaterial } from '../game/production';
 import { barrioAttractiveness, barrioCapacity, populationTarget, populationTrend } from '../game/citizens';
+import { gameDay, shownStreets, streetsLevel, streetsState } from '../game/streets';
 import { BUILDING_COUNT, BUILDING_GLYPH, MATERIAL_LABEL, formatNumber, plural } from '../game/format';
 import { configOf, type Barrio, type CityConfig, type Lot, type Material, type PublicWork } from '../types/game';
 import { AttractivenessFactors } from './AttractivenessFactors';
@@ -54,6 +59,7 @@ export function BarrioPanel({
       </section>
 
       <Citizens barrio={barrio} lots={lots} works={works} cfg={cfg} />
+      {barrio.status === 'abierto' && <Streets barrio={barrio} cfg={cfg} timezone={snapshot.city.timezone} />}
 
       <section>
         <h3>Qué se produce por hora</h3>
@@ -152,4 +158,108 @@ function Citizens({ barrio, lots, works, cfg }: { barrio: Barrio; lots: Lot[]; w
       <AttractivenessFactors attractiveness={attractiveness} workName={work?.name} />
     </section>
   );
+}
+
+// Cuántos días de mantenimientos se listan (docs/07, panel Barrio).
+const MAINTENANCE_DAYS = 7;
+
+// Estado de las calles, el botón para mantenerlas y quién lo hizo esta semana (docs/05 §18).
+function Streets({ barrio, cfg, timezone }: { barrio: Barrio; cfg: CityConfig; timezone: string }) {
+  const me = useCity((s) => s.me)!;
+  const inventory = useCity((s) => s.inventory);
+  const players = useCity((s) => s.snapshot?.players ?? []);
+  const now = useNow(60_000);
+  const [log, setLog] = useState<{ actor_id: string | null; created_at: string }[] | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Cada mantenimiento mueve streets_updated_at: con eso alcanza para saber cuándo releer.
+  useEffect(() => {
+    let cancelled = false;
+    loadStreetMaintenance(barrio.id, MAINTENANCE_DAYS)
+      .then((rows) => !cancelled && setLog(rows))
+      .catch(() => !cancelled && setLog([]));
+    return () => {
+      cancelled = true;
+    };
+  }, [barrio.id, barrio.streets_updated_at]);
+
+  const state = streetsState(barrio, cfg, now);
+  const shown = shownStreets(state);
+  const s = cfg.streets;
+  const cost = cfg.materials.types.filter((m) => (s.cost[m] ?? 0) > 0);
+  const costText = ['1 jornada', ...cost.map((m) => `${s.cost[m]} ${MATERIAL_LABEL[m]}`)].join(', ');
+
+  const today = gameDay(now, timezone);
+  const doneToday =
+    (log ?? []).filter((r) => r.actor_id === me.id && gameDay(r.created_at, timezone) === today).length >=
+    s.max_per_player_per_day;
+  const short = cost.filter((m) => (inventory?.[m] ?? 0) < (s.cost[m] ?? 0));
+  const blocked =
+    shown >= 100
+      ? 'Están al día.'
+      : doneToday
+        ? 'Hoy ya las mantuviste. Mañana podés de nuevo.'
+        : me.jornadas < 1
+          ? new GameError('NO_JORNADAS').message
+          : short.length > 0
+            ? `Te falta ${short.map((m) => MATERIAL_LABEL[m]).join(' y ')}: cuesta ${costText}.`
+            : null;
+
+  // "Marta (3), Juan (1)": quién las mantuvo, de más a menos veces.
+  const names = new Map(players.map((p) => [p.id, p.display_name]));
+  const counts = new Map<string, number>();
+  for (const r of log ?? []) if (r.actor_id) counts.set(r.actor_id, (counts.get(r.actor_id) ?? 0) + 1);
+  const who = [...counts].sort((a, b) => b[1] - a[1]).map(([id, n]) => `${names.get(id) ?? 'Alguien'} (${n})`);
+
+  const maintain = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await maintainStreets(barrio.id);
+    } catch (err) {
+      setError(messageOf(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section>
+      <h3>Calles</h3>
+      <p className="citizens">
+        Estado <strong>{shown}</strong> de 100 · {streetsLevel(state)}
+      </p>
+      <div className={`bar streets ${streetsLevel(state)}`}>
+        <span style={{ width: `${state}%` }} />
+      </div>
+      <p className="muted">
+        Se gastan {s.decay_per_day} por día; cada mantenimiento suma {s.points}.
+      </p>
+      {error && <p className="error">{error}</p>}
+      {blocked ? (
+        <p className="muted">{blocked}</p>
+      ) : (
+        <div className="row">
+          <button type="button" className="primary" disabled={busy} onClick={maintain}>
+            Mantener ({costText})
+          </button>
+        </div>
+      )}
+      {log && (
+        <p className="muted">
+          {who.length ? `Las mantuvieron: ${who.join(', ')}.` : 'Nadie las mantuvo esta semana.'}
+        </p>
+      )}
+    </section>
+  );
+}
+
+function useNow(everyMs: number): number {
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), everyMs);
+    return () => clearInterval(id);
+  }, [everyMs]);
+  return now;
 }

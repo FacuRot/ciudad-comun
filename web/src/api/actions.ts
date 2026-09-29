@@ -4,6 +4,7 @@ import { codeOf, GameError } from './errors';
 import { refreshMe } from './sync';
 import { useCity } from '../store/city';
 import type {
+  Barrio,
   BuildingType,
   Construction,
   GameEvent,
@@ -127,6 +128,15 @@ export async function careLot(lotId: string): Promise<Lot> {
   useCity.getState().applyLot(data as Lot);
   await refreshMe().catch(() => {});
   return data as Lot;
+}
+
+// Mantener las calles de un barrio abierto: 1 jornada y streets.cost, suma streets.points.
+export async function maintainStreets(barrioId: string): Promise<Barrio> {
+  const { data, error } = await sb.rpc('maintain_streets', { p_barrio_id: barrioId });
+  if (error) throw new GameError(codeOf(error));
+  useCity.getState().applyBarrio(data as Barrio);
+  await refreshMe().catch(() => {});
+  return data as Barrio;
 }
 
 // Regalar materiales: sin jornada, mínimo gift.min_amount.

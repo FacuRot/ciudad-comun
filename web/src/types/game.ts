@@ -25,7 +25,9 @@ export type MapLot = Pick<
   'id' | 'barrio_id' | 'x' | 'y' | 'status' | 'name' | 'color' | 'building_type' | 'level' | 'state'
 >;
 export type MapWork = Pick<PublicWork, 'id' | 'barrio_id' | 'name' | 'x' | 'y' | 'cost' | 'progress' | 'status'>;
-export type MapBarrio = Pick<Barrio, 'id' | 'name' | 'ordinal' | 'status' | 'population'>;
+// `streets`: el estado de las calles de ahora (docs/05 §18). En /join lo calcula el servidor;
+// en /city, el cliente con la config (game/streets.ts).
+export type MapBarrio = Pick<Barrio, 'id' | 'name' | 'ordinal' | 'status' | 'population'> & { streets?: number };
 
 export type JoinMap = {
   timezone: string;
@@ -67,6 +69,13 @@ export type CityConfig = {
     departure_rate: number;
   };
   residential: { capacity_by_level: Record<string, number> };
+  streets: {
+    initial: number;
+    decay_per_day: number;
+    points: number;
+    cost: Partial<Record<Material, number>>;
+    max_per_player_per_day: number;
+  };
 };
 
 export function configOf(city: City): CityConfig {

@@ -95,7 +95,7 @@ Al abrirse llama a `visit_lot`.
 
 - Nombre, barrio, efecto al completarse.
 - Cuatro barras: ladrillo, madera, energía, jornadas, con "falta N".
-- Formulario de aporte: tres campos numéricos prellenados con `min(lo que tengo, lo que falta)`, botón "Aportar (1 jornada)". Se puede aportar con los tres campos en cero.
+- Formulario de aporte: tres campos numéricos prellenados con `min(lo que tengo, lo que falta)`, botón "Aportar (1 jornada)". Mientras falten jornadas, se puede aportar con los tres campos en cero. Con las jornadas completas, los tres en cero deshabilitan el botón y el panel dice "La obra ya tiene todas sus jornadas: ahora faltan materiales."
 - Placa: lista de contribuyentes ordenada por cantidad de aportes, con el propio destacado. Cuando la obra se completa, la placa queda fija con el título "La construyeron".
 
 ### Panel: Barrio (qué falta)

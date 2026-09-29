@@ -24,9 +24,12 @@ begin
     "decay": { "descuidado_after_days": 4, "abandonado_after_days": 8 },
     "gift": { "min_amount": 5 },
     "lots": { "max_claim_distance": 2 },
-    "barrio": { "open_threshold": 0.85, "open_after_days": 10 },
+    "barrio": { "open_threshold": 0.85, "open_after_days": 10, "open_population": 300 },
     "summary": { "min_hours_away": 2 },
-    "palette": ["terracota","ocre","oliva","teal","azul","lila","rosa","gris"]
+    "palette": ["terracota","ocre","oliva","teal","azul","lila","rosa","gris"],
+    "citizens": { "capacity_per_lot": 10, "consumption_per_day": 2,
+                  "weights": { "lotes": 0.3, "calles": 0.3, "abastecimiento": 0.3, "obra": 0.1 },
+                  "arrival_rate": 0.30, "departure_rate": 0.15 }
   }$j$::jsonb;
 
   insert into cities(name, config) values ('Ciudad Común · Cohorte 1', cfg) returning id into cid;

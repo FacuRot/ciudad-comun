@@ -21,6 +21,49 @@ export type Streets = {
   isCrossing: (x: number, y: number) => boolean;
 };
 
+type Parcel = Cell & { barrio_id: string };
+
+// De qué barrio es cada celda de calle (docs/05 §18): del que tiene más lotes en las ocho
+// celdas de alrededor; si empatan (la avenida del medio), del de menor número. Si no hay
+// ningún lote pegado, se mira una vuelta más afuera. Fuera del tablero vale la celda de
+// borde más cercana, así lo que entra y sale por el borde sigue siendo de su barrio.
+export function streetBarrios(
+  cols: number,
+  rows: number,
+  lots: Parcel[],
+  barrios: { id: string; ordinal: number }[],
+): (x: number, y: number) => string | null {
+  const barrioAt = new Map(lots.map((l) => [`${l.x},${l.y}`, l.barrio_id]));
+  const ordinal = new Map(barrios.map((b) => [b.id, b.ordinal]));
+  const cache = new Map<string, string | null>();
+  return (x, y) => {
+    const cx = Math.min(cols - 1, Math.max(0, Math.floor(x)));
+    const cy = Math.min(rows - 1, Math.max(0, Math.floor(y)));
+    const key = `${cx},${cy}`;
+    if (cache.has(key)) return cache.get(key)!;
+    let owner: string | null = null;
+    for (let r = 1; r <= 2 && owner === null; r++) {
+      const count = new Map<string, number>();
+      for (let dy = -r; dy <= r; dy++) {
+        for (let dx = -r; dx <= r; dx++) {
+          const id = barrioAt.get(`${cx + dx},${cy + dy}`);
+          if ((dx || dy) && id) count.set(id, (count.get(id) ?? 0) + 1);
+        }
+      }
+      let best = 0;
+      for (const [id, n] of count) {
+        const tie = n === best && owner !== null && (ordinal.get(id) ?? 0) < (ordinal.get(owner) ?? 0);
+        if (n > best || tie) {
+          best = n;
+          owner = id;
+        }
+      }
+    }
+    cache.set(key, owner);
+    return owner;
+  };
+}
+
 export function streetsOf(cols: number, rows: number, built: Cell[]): Streets {
   const taken = new Set(built.map((c) => `${c.x},${c.y}`));
   const inside = (x: number, y: number) => x >= 0 && y >= 0 && x < cols && y < rows;

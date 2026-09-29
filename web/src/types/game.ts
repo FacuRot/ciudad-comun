@@ -25,7 +25,7 @@ export type MapLot = Pick<
   'id' | 'barrio_id' | 'x' | 'y' | 'status' | 'name' | 'color' | 'building_type' | 'level' | 'state'
 >;
 export type MapWork = Pick<PublicWork, 'id' | 'barrio_id' | 'name' | 'x' | 'y' | 'cost' | 'progress' | 'status'>;
-export type MapBarrio = Pick<Barrio, 'id' | 'name' | 'ordinal' | 'status'>;
+export type MapBarrio = Pick<Barrio, 'id' | 'name' | 'ordinal' | 'status' | 'population'>;
 
 export type JoinMap = {
   timezone: string;
@@ -57,7 +57,15 @@ export type CityConfig = {
   decay: { descuidado_after_days: number; abandonado_after_days: number };
   gift: { min_amount: number };
   lots: { max_claim_distance: number };
+  barrio: { open_threshold: number; open_after_days: number; open_population: number };
   palette: string[];
+  citizens: {
+    capacity_per_lot: number;
+    consumption_per_day: number;
+    weights: Record<'lotes' | 'calles' | 'abastecimiento' | 'obra', number>;
+    arrival_rate: number;
+    departure_rate: number;
+  };
 };
 
 export function configOf(city: City): CityConfig {

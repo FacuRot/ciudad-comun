@@ -1,5 +1,6 @@
-// Tránsito de adorno: unos pocos autos que cruzan la ciudad por las avenidas y gente
-// que camina por las veredas. No lee nada del juego salvo dónde hay calle, y no cambia nada.
+// Tránsito: unos pocos autos que cruzan la ciudad por las avenidas y gente que camina
+// por las veredas. Muestra el juego pero no lo cambia: la gente de cada barrio sale de su
+// población (docs/05 §16.5); fuera de eso solo lee dónde hay calle.
 //
 // Los autos van por las avenidas que atraviesan el tablero de punta a punta, por la
 // mano derecha y sin doblar. En un cruce de avenidas pasa una sola por vez, y antes de
@@ -9,16 +10,18 @@
 import type { Layout } from './layout';
 import type { Scene } from './draw';
 import { darken, lighten, mix } from './colors';
-import { CURB, streetsOf, ZEBRA, ZEBRA_DEPTH, ZEBRA_MID, type Streets } from './streets';
+import { CURB, streetBarrios, streetsOf, ZEBRA, ZEBRA_DEPTH, ZEBRA_MID, type Streets } from './streets';
 import { phaseAt, type Phase } from './time';
 
 // Cuánto se llena la ciudad según la hora. De noche queda poca gente en la calle.
 const SHARE: Record<Phase, number> = { dia: 1, atardecer: 0.75, noche: 0.4 };
 // Uno cada tantos tiles de avenida o de vereda, con techo: la calle nunca se llena.
 const TILES_PER_CAR = 5;
-const TILES_PER_WALKER = 6;
+const TILES_PER_WALKER = 2;
 const MAX_CARS = 5;
-const MAX_WALKERS = 8;
+// La gente de un barrio: una persona cada tantos ciudadanos, con techo (docs/07, "El canvas").
+const CITIZENS_PER_WALKER = 25;
+const MAX_WALKERS_PER_BARRIO = 8;
 
 const LANE_OFFSET = 0.165; // del eje de la calle al medio de cada mano
 const CAR_GAP = 0.14; // entre paragolpes, en la fila
@@ -75,6 +78,7 @@ type Node = { x: number; y: number; edges: Edge[]; exit: boolean };
 type Edge = { a: Node; b: Node; pts: [number, number][]; len: number; zebra: Zebra | null };
 
 type Walker = {
+  home: string; // el barrio que la puso en la calle
   edge: Edge;
   from: Node;
   d: number; // cuánto lleva caminado del tramo
@@ -99,13 +103,15 @@ type Network = {
   exits: Node[]; // por donde se entra y se sale del tablero caminando
   strolls: Edge[]; // tramos de vereda donde puede aparecer alguien
   laneTiles: number;
-  walkTiles: number;
 };
+
+// Dónde puede aparecer la gente de cada barrio: sus tramos de vereda y sus bordes.
+type Home = { strolls: Edge[]; exits: Node[]; walkTiles: number };
 
 const pick = <T>(items: T[]): T => items[Math.floor(Math.random() * items.length)];
 const other = (edge: Edge, node: Node) => (edge.a === node ? edge.b : edge.a);
 
-type Grid = Pick<Scene, 'cols' | 'rows' | 'lots' | 'works' | 'timezone'>;
+type Grid = Pick<Scene, 'cols' | 'rows' | 'lots' | 'works' | 'barrios' | 'timezone'>;
 
 // Qué celdas están construidas: si no cambia, la red de calles es la misma.
 const gridKey = (g: Grid) =>
@@ -116,6 +122,7 @@ const gridKey = (g: Grid) =>
 
 export class Traffic {
   private net: Network | null = null;
+  private homes = new Map<string, Home>();
   private source: { lots: Grid['lots']; works: Grid['works']; key: string } | null = null;
   private cars: Car[] = [];
   private people: Walker[] = [];
@@ -137,6 +144,7 @@ export class Traffic {
       const key = gridKey(scene);
       if (key !== this.source?.key) {
         this.net = buildNetwork(streetsOf(scene.cols, scene.rows, [...scene.lots, ...scene.works]));
+        this.homes = homesOf(this.net, scene);
         this.cars = [];
         this.people = [];
         fresh = true;
@@ -147,12 +155,24 @@ export class Traffic {
 
     const share = this.still ? 0 : SHARE[phaseAt(new Date(), scene.timezone)];
     const carTarget = Math.round(Math.min(MAX_CARS, net.laneTiles / TILES_PER_CAR) * share);
-    const walkerTarget = Math.round(Math.min(MAX_WALKERS, net.walkTiles / TILES_PER_WALKER) * share);
+    const walkerTargets = new Map<string, number>();
+    for (const barrio of scene.barrios) {
+      const home = this.homes.get(barrio.id);
+      if (!home) continue;
+      const people = Math.min(
+        MAX_WALKERS_PER_BARRIO,
+        Math.ceil((barrio.population ?? 0) / CITIZENS_PER_WALKER),
+        home.walkTiles / TILES_PER_WALKER,
+      );
+      walkerTargets.set(barrio.id, Math.round(people * share));
+    }
 
     // Al abrir el mapa la ciudad ya está andando: se reparten por adentro.
     if (fresh) {
       for (let i = 0; i < carTarget * 6 && this.cars.length < carTarget; i++) this.spawnCar(true);
-      for (let i = 0; i < walkerTarget && net.strolls.length; i++) this.spawnWalker(true);
+      for (const [id, target] of walkerTargets) {
+        for (let i = 0; i < target; i++) this.spawnWalker(id, true);
+      }
     }
 
     this.stepCars(dt);
@@ -163,9 +183,19 @@ export class Traffic {
     if (this.cars.length < carTarget && this.nextCar <= 0 && this.spawnCar(false)) {
       this.nextCar = 2 + Math.random() * 4;
     }
+    // La gente también entra de a una, por el barrio al que más le falta.
     this.nextWalker -= dt;
-    if (this.people.length < walkerTarget && this.nextWalker <= 0 && this.spawnWalker(Math.random() < 0.3)) {
-      this.nextWalker = 1.5 + Math.random() * 3;
+    if (this.nextWalker <= 0) {
+      let home: string | null = null;
+      let missing = 0;
+      for (const [id, target] of walkerTargets) {
+        const gap = target - this.people.filter((w) => w.home === id).length;
+        if (gap > missing) {
+          missing = gap;
+          home = id;
+        }
+      }
+      if (home && this.spawnWalker(home, Math.random() < 0.3)) this.nextWalker = 1.5 + Math.random() * 3;
     }
   }
 
@@ -279,24 +309,26 @@ export class Traffic {
 
   // --- Gente -----------------------------------------------------------
 
-  // `inside`: aparece en una vereda (sale de algún lado); si no, entra caminando por el borde.
-  private spawnWalker(inside: boolean): boolean {
-    const net = this.net;
-    if (!net) return false;
+  // `inside`: aparece en una vereda de su barrio (sale de algún lado); si no, entra
+  // caminando por un borde de su barrio. Después camina por donde quiera.
+  private spawnWalker(homeId: string, inside: boolean): boolean {
+    const home = this.homes.get(homeId);
+    if (!home) return false;
     let edge: Edge;
     let from: Node;
     let d = 0;
-    if (!inside && net.exits.length) {
-      from = pick(net.exits);
+    if (!inside && home.exits.length) {
+      from = pick(home.exits);
       edge = from.edges[0];
-    } else if (net.strolls.length) {
-      edge = pick(net.strolls);
+    } else if (home.strolls.length) {
+      edge = pick(home.strolls);
       from = Math.random() < 0.5 ? edge.a : edge.b;
       d = Math.random() * edge.len;
     } else {
       return false;
     }
     this.people.push({
+      home: homeId,
       edge,
       from,
       d,
@@ -585,8 +617,50 @@ function buildNetwork(g: Streets): Network {
     exits,
     strolls,
     laneTiles: lanes.reduce((sum, l) => sum + l.length, 0),
-    walkTiles: strolls.reduce((sum, e) => sum + e.len, 0),
   };
+}
+
+// Reparte las veredas y los bordes entre los barrios. Una vereda es del barrio del lote que
+// tiene enfrente: así cada mano de la avenida del medio es de su lado. Si enfrente no hay
+// lote (una esquina, una obra), es del barrio de la celda de calle (docs/05 §18).
+function homesOf(net: Network, grid: Grid): Map<string, Home> {
+  const { cols, rows } = grid;
+  const lotAt = new Map(grid.lots.map((l) => [`${l.x},${l.y}`, l.barrio_id]));
+  const streetOf = streetBarrios(cols, rows, grid.lots, grid.barrios);
+  const barrioOf = (px: number, py: number) => {
+    const x = Math.min(cols - 1e-6, Math.max(0, px));
+    const y = Math.min(rows - 1e-6, Math.max(0, py));
+    const cx = Math.floor(x);
+    const cy = Math.floor(y);
+    // El borde de la celda más cercano es el cordón de esta vereda; el lote está del otro lado.
+    const fx = x - cx;
+    const fy = y - cy;
+    const [dx, dy] = Math.min(fx, 1 - fx) < Math.min(fy, 1 - fy) ? [fx < 0.5 ? -1 : 1, 0] : [0, fy < 0.5 ? -1 : 1];
+    return lotAt.get(`${cx + dx},${cy + dy}`) ?? streetOf(cx, cy);
+  };
+  const homes = new Map<string, Home>();
+  const homeOf = (x: number, y: number) => {
+    const id = barrioOf(x, y);
+    if (!id) return null;
+    let home = homes.get(id);
+    if (!home) homes.set(id, (home = { strolls: [], exits: [], walkTiles: 0 }));
+    return home;
+  };
+  for (const edge of net.strolls) {
+    const home = homeOf((edge.a.x + edge.b.x) / 2, (edge.a.y + edge.b.y) / 2);
+    if (!home) continue;
+    home.strolls.push(edge);
+    home.walkTiles += edge.len;
+  }
+  // Un borde es de quien tenga la vereda que llega a él: se mira un poco adentro del tablero.
+  for (const exit of net.exits) {
+    const edge = exit.edges[0];
+    const border = other(edge, exit);
+    const d = Math.hypot(border.x - exit.x, border.y - exit.y) || 1;
+    const inward = 0.3 / d;
+    homeOf(border.x + (border.x - exit.x) * inward, border.y + (border.y - exit.y) * inward)?.exits.push(exit);
+  }
+  return homes;
 }
 
 // Al llegar a una punta: cualquier camino menos volver, y cruzar es menos común que seguir.

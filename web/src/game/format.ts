@@ -1,5 +1,6 @@
 // Cómo se nombran y se muestran las cosas del juego. Los números vienen de la config; acá solo el texto.
 import type { BuildingType, Material } from '../types/game';
+import type { FactorKey } from './citizens';
 
 export const MATERIAL_LABEL: Record<Material, string> = { ladrillo: 'ladrillo', madera: 'madera', energia: 'energía' };
 
@@ -25,6 +26,28 @@ export const BUILDING_GLYPH: Record<BuildingType, string> = {
   generador: '⚡︎',
   plaza: '✿',
 };
+
+// Los factores del atractivo (docs/05 §16.2). La obra se nombra con el nombre de la del barrio.
+export const FACTOR_LABEL: Record<FactorKey, string> = {
+  lotes: 'Vecinos presentes',
+  calles: 'Calles',
+  abastecimiento: 'Abastecimiento',
+  obra: 'Obra del barrio',
+};
+
+// "Lo que más resta: …". El artículo de la obra sale de su nombre: la Escuela, el Hospital.
+export function reasonText(reason: FactorKey, workName?: string): string {
+  switch (reason) {
+    case 'lotes':
+      return 'los lotes descuidados';
+    case 'calles':
+      return 'las calles';
+    case 'abastecimiento':
+      return 'la falta de producción';
+    case 'obra':
+      return workName ? `que falta terminar ${workName.endsWith('a') ? 'la' : 'el'} ${workName}` : 'que falta terminar la obra';
+  }
+}
 
 const decimal = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 1 });
 

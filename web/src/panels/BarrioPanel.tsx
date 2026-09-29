@@ -1,9 +1,26 @@
-// Panel de barrio (docs/07-pantallas-y-flujos.md): qué se produce, qué edificios hay y qué falta.
+// Panel de barrio (docs/07-pantallas-y-flujos.md): qué se produce, qué edificios hay y qué falta,
+// y lo colectivo: sus ciudadanos (docs/05 §16).
 import { useCity } from '../store/city';
 import { workPercent } from '../game/geo';
 import { effectiveRate, scarceMaterial } from '../game/production';
-import { BUILDING_COUNT, BUILDING_GLYPH, MATERIAL_LABEL, formatNumber, plural } from '../game/format';
-import { configOf, type Barrio, type Material } from '../types/game';
+import {
+  barrioAttractiveness,
+  barrioCapacity,
+  FACTOR_KEYS,
+  populationTarget,
+  populationTrend,
+} from '../game/citizens';
+import {
+  BUILDING_COUNT,
+  BUILDING_GLYPH,
+  FACTOR_LABEL,
+  MATERIAL_LABEL,
+  formatNumber,
+  formatPercent,
+  plural,
+  reasonText,
+} from '../game/format';
+import { configOf, type Barrio, type CityConfig, type Lot, type Material, type PublicWork } from '../types/game';
 import { PanelBack } from './PanelBack';
 
 export function BarrioPanel({
@@ -49,6 +66,8 @@ export function BarrioPanel({
         </p>
       </section>
 
+      <Citizens barrio={barrio} lots={lots} works={works} cfg={cfg} />
+
       <section>
         <h3>Qué se produce por hora</h3>
         <ul className="cost">
@@ -90,5 +109,74 @@ export function BarrioPanel({
         </section>
       )}
     </aside>
+  );
+}
+
+const TREND = {
+  1: { arrow: '↑', text: 'mañana llegan más' },
+  0: { arrow: '', text: '' },
+  [-1]: { arrow: '↓', text: 'mañana se va gente' },
+} as const;
+
+// Población, objetivo de hoy, capacidad y los cuatro factores del atractivo (docs/07, panel Barrio).
+function Citizens({ barrio, lots, works, cfg }: { barrio: Barrio; lots: Lot[]; works: PublicWork[]; cfg: CityConfig }) {
+  if (barrio.status !== 'abierto') {
+    return (
+      <section>
+        <h3>Ciudadanos</h3>
+        <p className="muted">Se abre pronto.</p>
+      </section>
+    );
+  }
+
+  const capacity = barrioCapacity(barrio.id, lots, cfg);
+  const attractiveness = barrioAttractiveness(barrio, lots, works, cfg);
+  const target = populationTarget(capacity, attractiveness.value);
+  const trend = TREND[populationTrend(barrio.population, target)];
+  const built = lots.filter((l) => l.barrio_id === barrio.id && l.level > 0).length;
+  const work = works.find((w) => w.barrio_id === barrio.id);
+  const reason = attractiveness.mainReason;
+
+  return (
+    <section>
+      <h3>Ciudadanos</h3>
+      <p className="citizens">
+        <strong>{formatNumber(barrio.population)}</strong> de {formatNumber(target)} ciudadanos
+        {trend.arrow && (
+          <span className="trend" title={trend.text} aria-label={trend.text}>
+            {' '}
+            {trend.arrow}
+          </span>
+        )}
+      </p>
+      <p className="muted">
+        {capacity > 0
+          ? `Hay lugar para ${formatNumber(capacity)}: ${plural(built, 'lote con edificio', 'lotes con edificio')}.`
+          : `Todavía no vive nadie: cada lote con edificio da lugar a ${cfg.citizens.capacity_per_lot}.`}
+      </p>
+      <ul className="factors">
+        {FACTOR_KEYS.map((key) => {
+          const value = attractiveness.factors[key];
+          return (
+            <li key={key} className={key === reason ? 'worst' : undefined}>
+              <span>{key === 'obra' && work ? work.name : FACTOR_LABEL[key]}</span>
+              <span>{formatPercent(value)}</span>
+              <div className="bar">
+                <span style={{ width: `${value * 100}%` }} />
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+      <p>
+        {reason ? (
+          <>
+            Lo que más resta: <strong>{reasonText(reason, work?.name)}</strong>.
+          </>
+        ) : (
+          'No le falta nada.'
+        )}
+      </p>
+    </section>
   );
 }

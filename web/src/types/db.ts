@@ -21,6 +21,7 @@ export type Database = {
           name: string
           opened_at: string | null
           ordinal: number
+          population: number
           status: Database["public"]["Enums"]["barrio_status_t"]
         }
         Insert: {
@@ -29,6 +30,7 @@ export type Database = {
           name: string
           opened_at?: string | null
           ordinal: number
+          population?: number
           status?: Database["public"]["Enums"]["barrio_status_t"]
         }
         Update: {
@@ -37,6 +39,7 @@ export type Database = {
           name?: string
           opened_at?: string | null
           ordinal?: number
+          population?: number
           status?: Database["public"]["Enums"]["barrio_status_t"]
         }
         Relationships: [
@@ -801,6 +804,8 @@ export type Database = {
         }
       }
       create_invitation: { Args: never; Returns: string }
+      fx_barrio_attractiveness: { Args: { p_barrio_id: string }; Returns: Json }
+      fx_barrio_capacity: { Args: { p_barrio_id: string }; Returns: number }
       fx_collect_production: { Args: { p_player: string }; Returns: Json }
       fx_config: { Args: { p_city: string }; Returns: Json }
       fx_effective_rate: {
@@ -922,6 +927,7 @@ export type Database = {
       job_complete_constructions: { Args: never; Returns: undefined }
       job_refill_jornadas: { Args: never; Returns: undefined }
       job_update_lot_states: { Args: never; Returns: undefined }
+      job_update_population: { Args: never; Returns: undefined }
       my_city_id: { Args: never; Returns: string }
       recolor_lot: { Args: { p_color: string }; Returns: undefined }
       rename_lot: { Args: { p_name: string }; Returns: undefined }

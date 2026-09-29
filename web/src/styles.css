@@ -291,6 +291,15 @@ button.link .edit {
   background: var(--danger);
 }
 
+/* Calles: la barra toma el color del estado (docs/05 §18). */
+.bar.streets.gastadas > span {
+  background: #d09a2e;
+}
+
+.bar.streets.rotas > span {
+  background: var(--danger);
+}
+
 /* En móvil el panel va abajo y la pantalla no se desplaza: el mapa es una
    ventana fija con zoom y el panel desplaza su propio contenido. */
 @media (max-width: 767px) {

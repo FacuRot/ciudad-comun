@@ -57,6 +57,10 @@ create function pg_temp.barrio(p_ordinal int) returns uuid language sql as $$
 create function pg_temp.population_event() returns jsonb language sql as $$
   select payload from events where type = 'barrio.population_changed' $$;
 
+-- Las calles se gastan desde el seed: se las deja recién mantenidas para que los atractivos
+-- de las pruebas no dependan de cuánto hace que se sembró la base.
+update barrios set streets_updated_at = now() where status = 'abierto';
+
 -- A, B y C van a tener lote. D es un usuario autenticado sin jugador.
 insert into auth.users(id, email) values
   ('11111111-1111-1111-1111-111111111111', 'a@test.local'),
@@ -315,6 +319,8 @@ select pg_temp.ok((select count(*) = 34 from lots l join barrios b on b.id = l.b
                   'apertura por tiempo: 34 lotes libres');
 select pg_temp.ok((select count(*) = 1 from events where type = 'barrio.opened'), 'job_check_barrio_opening es idempotente');
 select pg_temp.ok((select payload->>'reason' = 'time' from events where type = 'barrio.opened'), 'la razón de la apertura es el tiempo');
+select pg_temp.ok((select (population, streets_state, streets_updated_at) = (0, 100::numeric, now()) from barrios where ordinal = 2),
+                  'al abrirse, el barrio arranca sin población y con las calles en 100 y el reloj en marcha');
 
 -- ---------------------------------------------------------------------
 -- Obra completa y bonus
@@ -386,6 +392,65 @@ select job_complete_constructions();
 select pg_temp.ok(fx_barrio_capacity(pg_temp.barrio(1)) = 80
                   and (select rent_material = 'madera' from lots where x = 1 and y = 0),
                   'el residencial nivel 2 aloja 60 y sigue cobrando en madera');
+
+-- ---------------------------------------------------------------------
+-- Calles
+-- ---------------------------------------------------------------------
+select pg_temp.as_user('11111111-1111-1111-1111-111111111111');
+update players set jornadas = 6 where id in ('11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222',
+                                             '33333333-3333-3333-3333-333333333333');
+update inventories set ladrillo = 50 where player_id in ('11111111-1111-1111-1111-111111111111',
+                                                         '22222222-2222-2222-2222-222222222222');
+update inventories set ladrillo = 5 where player_id = '33333333-3333-3333-3333-333333333333';
+
+-- Recién mantenidas no hay nada que hacer; tampoco si lo que se ve redondeado ya es 100.
+select pg_temp.err($$select maintain_streets(pg_temp.barrio(1))$$, 'STREETS_FULL');
+update barrios set streets_state = 99.6 where ordinal = 1;
+select pg_temp.err($$select maintain_streets(pg_temp.barrio(1))$$, 'STREETS_FULL');
+select pg_temp.err($$select maintain_streets(gen_random_uuid())$$, 'OTHER_CITY');
+update barrios set status = 'cerrado' where ordinal = 2;
+update barrios set streets_state = 50 where ordinal = 2;
+select pg_temp.err($$select maintain_streets(pg_temp.barrio(2))$$, 'STREETS_FULL');
+update barrios set status = 'abierto', streets_state = 100 where ordinal = 2;
+
+-- Desgaste perezoso: 3 días a 10 por día son 30 puntos, y nunca baja de 0.
+update barrios set streets_state = 100, streets_updated_at = now() - interval '3 days' where ordinal = 1;
+select pg_temp.ok(fx_streets_state(pg_temp.barrio(1)) = 70, 'las calles se gastan 10 por día');
+select pg_temp.ok(((fx_barrio_attractiveness(pg_temp.barrio(1)))->'factors'->>'calles')::numeric = 0.7,
+                  'el factor calles del atractivo es el estado ÷ 100');
+update barrios set streets_updated_at = now() - interval '20 days' where ordinal = 2;
+select pg_temp.ok(fx_streets_state(pg_temp.barrio(2)) = 0, 'las calles no bajan de 0');
+
+-- A mantiene las del Barrio 1: 70 + 4.
+select pg_temp.ok((maintain_streets(pg_temp.barrio(1))).streets_state = 74, 'maintain_streets suma 4 puntos');
+select pg_temp.ok((select streets_updated_at = now() from barrios where ordinal = 1), 'mantener guarda el estado y reinicia el reloj');
+select pg_temp.ok((select (jornadas, ladrillo) = (5, 40) from players p join inventories i on i.player_id = p.id
+                    where p.id = '11111111-1111-1111-1111-111111111111'), 'mantener cuesta 1 jornada y 10 de ladrillo');
+select pg_temp.ok((select payload @> jsonb_build_object('barrio_id', pg_temp.barrio(1), 'points', 4, 'state', 74) from events
+                    where type = 'streets.maintained'), 'streets.maintained lleva barrio, puntos y estado');
+select pg_temp.err($$select maintain_streets(pg_temp.barrio(1))$$, 'STREETS_DONE_TODAY');
+-- El de otro barrio sí se puede: el tope es por barrio.
+select pg_temp.ok((maintain_streets(pg_temp.barrio(2))).streets_state = 4, 'se puede mantener cualquier barrio abierto');
+
+-- B mantiene cerca del tope: suma solo lo que falta.
+select pg_temp.as_user('22222222-2222-2222-2222-222222222222');
+update barrios set streets_state = 98, streets_updated_at = now() where ordinal = 1;
+select pg_temp.ok((maintain_streets(pg_temp.barrio(1))).streets_state = 100, 'mantener tiene tope de 100');
+select pg_temp.ok((select payload->>'points' = '2.00' from events
+                    where type = 'streets.maintained' and actor_id = '22222222-2222-2222-2222-222222222222'),
+                  'points lleva lo que sumó de verdad');
+
+-- C no tiene ladrillo; y al día siguiente A puede de nuevo.
+select pg_temp.as_user('33333333-3333-3333-3333-333333333333');
+update barrios set streets_state = 50 where ordinal = 1;
+select pg_temp.err($$select maintain_streets(pg_temp.barrio(1))$$, 'NO_MATERIALS');
+update players set jornadas = 0 where id = '33333333-3333-3333-3333-333333333333';
+select pg_temp.err($$select maintain_streets(pg_temp.barrio(1))$$, 'NO_JORNADAS');
+select pg_temp.as_user('11111111-1111-1111-1111-111111111111');
+update events set created_at = created_at - interval '1 day'
+ where type = 'streets.maintained' and actor_id = '11111111-1111-1111-1111-111111111111';
+select pg_temp.ok((maintain_streets(pg_temp.barrio(1))).streets_state = 54, 'el tope se renueva con el día del juego');
+select pg_temp.ok((invitation_map(pg_temp.tok()))->'barrios'->0 ? 'streets', 'invitation_map trae el estado de las calles');
 
 -- ---------------------------------------------------------------------
 -- Admin, invitaciones y NO_PLAYER

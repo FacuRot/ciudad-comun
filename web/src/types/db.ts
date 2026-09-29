@@ -23,6 +23,8 @@ export type Database = {
           ordinal: number
           population: number
           status: Database["public"]["Enums"]["barrio_status_t"]
+          streets_state: number
+          streets_updated_at: string | null
         }
         Insert: {
           city_id: string
@@ -32,6 +34,8 @@ export type Database = {
           ordinal: number
           population?: number
           status?: Database["public"]["Enums"]["barrio_status_t"]
+          streets_state: number
+          streets_updated_at?: string | null
         }
         Update: {
           city_id?: string
@@ -41,6 +45,8 @@ export type Database = {
           ordinal?: number
           population?: number
           status?: Database["public"]["Enums"]["barrio_status_t"]
+          streets_state?: number
+          streets_updated_at?: string | null
         }
         Relationships: [
           {
@@ -887,6 +893,7 @@ export type Database = {
         Args: { p_e: number; p_l: number; p_m: number; p_player: string }
         Returns: undefined
       }
+      fx_streets_state: { Args: { p_barrio_id: string }; Returns: number }
       get_summary: {
         Args: { p_since: string }
         Returns: {
@@ -940,6 +947,26 @@ export type Database = {
       job_refill_jornadas: { Args: never; Returns: undefined }
       job_update_lot_states: { Args: never; Returns: undefined }
       job_update_population: { Args: never; Returns: undefined }
+      maintain_streets: {
+        Args: { p_barrio_id: string }
+        Returns: {
+          city_id: string
+          id: string
+          name: string
+          opened_at: string | null
+          ordinal: number
+          population: number
+          status: Database["public"]["Enums"]["barrio_status_t"]
+          streets_state: number
+          streets_updated_at: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "barrios"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       my_city_id: { Args: never; Returns: string }
       recolor_lot: { Args: { p_color: string }; Returns: undefined }
       rename_lot: { Args: { p_name: string }; Returns: undefined }

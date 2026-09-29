@@ -6,7 +6,18 @@ import { useCity } from '../store/city';
 import { workAmounts, workPercent } from '../game/geo';
 import { BUILDING_LABEL, MATERIAL_LABEL, formatPercent, plural, reasonText } from '../game/format';
 import type { FactorKey } from '../game/citizens';
-import type { BuildingType, GameEvent, MapBarrio, Material, PublicWork, WorkAmounts } from '../types/game';
+import { shownStreets, streetsLevel, streetsState } from '../game/streets';
+import {
+  configOf,
+  type Barrio,
+  type BuildingType,
+  type CityConfig,
+  type GameEvent,
+  type MapBarrio,
+  type Material,
+  type PublicWork,
+  type WorkAmounts,
+} from '../types/game';
 
 const MAX_LINES = 8;
 
@@ -23,8 +34,11 @@ export function SummaryModal({
   onClose: () => void;
 }) {
   const snapshot = useCity((s) => s.snapshot)!;
+  const me = useCity((s) => s.me)!;
+  const myBarrioId = snapshot.lots.find((l) => l.owner_id === me.id)?.barrio_id;
+  const myBarrio = snapshot.barrios.find((b) => b.id === myBarrioId) ?? null;
   const [expanded, setExpanded] = useState(false);
-  const lines = buildLines(events, collected, snapshot.players, snapshot.works, snapshot.barrios);
+  const lines = buildLines(events, collected, snapshot.players, snapshot.works, snapshot.barrios, myBarrio, configOf(snapshot.city));
 
   // Si no pasó nada mientras no estaba, no hay nada que contar.
   if (lines.length === 0) return null;
@@ -65,6 +79,8 @@ function buildLines(
   players: Player[],
   works: PublicWork[],
   barrios: MapBarrio[],
+  myBarrio: Barrio | null,
+  cfg: CityConfig,
 ): Line[] {
   const names = new Map(players.map((p) => [p.id, p.display_name]));
   const nameOf = (id: string | null) => names.get(id ?? '') ?? 'Alguien';
@@ -207,6 +223,26 @@ function buildLines(
         </>
       ),
     });
+  }
+
+  // 7. Si las calles del barrio propio están gastadas o rotas ahora, un aviso con lo que cuesta mantenerlas.
+  if (myBarrio?.status === 'abierto') {
+    const state = streetsState(myBarrio, cfg);
+    const level = streetsLevel(state);
+    const cost = cfg.materials.types
+      .filter((m) => (cfg.streets.cost[m] ?? 0) > 0)
+      .map((m) => `${cfg.streets.cost[m]} de ${MATERIAL_LABEL[m]}`);
+    if (level !== 'buenas') {
+      lines.push({
+        key: 'streets',
+        node: (
+          <>
+            Las calles del barrio están <strong>{level}</strong> ({shownStreets(state)} de 100). Mantenerlas cuesta 1 jornada
+            {cost.length > 0 && ` y ${cost.join(' y ')}`}.
+          </>
+        ),
+      });
+    }
   }
 
   // 7. Al dueño de un residencial, cuánto rindió el alquiler: el atractivo con que se cobró.

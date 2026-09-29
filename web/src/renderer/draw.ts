@@ -9,7 +9,8 @@ import { workPercent, type Cell } from '../game/geo';
 import { formatRemaining } from '../game/format';
 import type { Layout } from './layout';
 import { ABANDONED, darken, desaturate, lighten, lotColor, mix } from './colors';
-import { CURB, streetsOf, ZEBRA } from './streets';
+import { CURB, streetBarrios, streetsOf, ZEBRA } from './streets';
+import { streetsLevel, type StreetsLevel } from '../game/streets';
 import { phaseAt, type Phase } from './time';
 import type { Traffic } from './traffic';
 
@@ -340,6 +341,17 @@ function drawStreets(ctx: CanvasRenderingContext2D, layout: Layout, scene: Scene
     if (!c.e) ctx.fillRect(c.px + t - curb, c.py + (c.n ? 0 : curb), lip, down);
   }
 
+  // Desgaste (docs/05 §18): cada celda se dibuja con el estado de las calles de su barrio.
+  const owner = streetBarrios(cols, rows, scene.lots, scene.barrios);
+  const levelOf = new Map(
+    scene.barrios.map((b) => [b.id, b.streets === undefined ? 'buenas' : streetsLevel(b.streets)] as const),
+  );
+  for (const c of cells) {
+    const id = owner(c.x, c.y);
+    const level = id ? levelOf.get(id) : undefined;
+    if (level && level !== 'buenas') drawWear(ctx, c, t, curb, level, theme);
+  }
+
   // Línea de eje: dos rayas por celda, con la misma separación dentro y entre celdas.
   const mark = Math.max(1.2, t * 0.03);
   ctx.fillStyle = theme.line;
@@ -387,6 +399,57 @@ function drawStreets(ctx: CanvasRenderingContext2D, layout: Layout, scene: Scene
 }
 
 type StreetTree = { cx: number; baseY: number; size: number };
+
+// Calles gastadas: grietas y de vez en cuando un bache. Rotas: grietas y baches por todos
+// lados. Todo cae sobre la calzada y sale de un sorteo por celda, así no titila entre cuadros.
+function drawWear(
+  ctx: CanvasRenderingContext2D,
+  c: { x: number; y: number; px: number; py: number },
+  t: number,
+  curb: number,
+  level: Exclude<StreetsLevel, 'buenas'>,
+  theme: Theme,
+) {
+  const inner = t - curb * 2; // la calzada, aunque la celda siga hacia los costados
+  const at = (u: number, v: number): [number, number] => [c.px + curb + inner * u, c.py + curb + inner * v];
+  const rnd = (k: string) => hash01(`${c.x},${c.y},${k}`);
+
+  // Grietas: un zigzag fino que arranca en algún lado de la calzada.
+  const cracks = level === 'rotas' ? 2 : rnd('g') < 0.7 ? 1 : 0;
+  ctx.save();
+  ctx.strokeStyle = darken(theme.asphalt, 0.32);
+  ctx.lineWidth = Math.max(0.8, t * 0.012);
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  for (let i = 0; i < cracks; i++) {
+    let [x, y] = at(0.1 + rnd(`cx${i}`) * 0.5, 0.15 + rnd(`cy${i}`) * 0.6);
+    const dx = (rnd(`cd${i}`) < 0.5 ? 1 : -1) * inner * 0.09;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    for (let k = 0; k < 4; k++) {
+      x += Math.abs(dx);
+      y += (k % 2 ? 1 : -1) * dx * 0.6;
+      ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // Baches: un hueco oscuro con el borde de asfalto roto más claro.
+  const holes = level === 'rotas' ? 2 + Math.floor(rnd('n') * 3) : rnd('b') < 0.3 ? 1 : 0;
+  for (let i = 0; i < holes; i++) {
+    const [x, y] = at(0.2 + rnd(`hx${i}`) * 0.6, 0.2 + rnd(`hy${i}`) * 0.6);
+    const r = inner * (0.06 + rnd(`hr${i}`) * 0.05);
+    ctx.fillStyle = lighten(theme.asphalt, 0.12);
+    ctx.beginPath();
+    ctx.ellipse(x, y, r * 1.35, r * 0.95, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = darken(theme.asphalt, 0.4);
+    ctx.beginPath();
+    ctx.ellipse(x, y + r * 0.08, r * 1.05, r * 0.7, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
 
 // Senda peatonal: cuatro bastones cruzados a la calzada, junto al borde que da al cruce.
 function zebra(

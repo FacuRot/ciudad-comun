@@ -1,6 +1,7 @@
 // Tránsito: unos pocos autos que cruzan la ciudad por las avenidas y gente que camina
 // por las veredas. Muestra el juego pero no lo cambia: la gente de cada barrio sale de su
-// población (docs/05 §16.5); fuera de eso solo lee dónde hay calle.
+// población (docs/05 §16.5) y los autos esquivan las calles rotas (§18); fuera de eso solo
+// lee dónde hay calle.
 //
 // Los autos van por las avenidas que atraviesan el tablero de punta a punta, por la
 // mano derecha y sin doblar. En un cruce de avenidas pasa una sola por vez, y antes de
@@ -12,6 +13,7 @@ import type { Scene } from './draw';
 import { darken, lighten, mix } from './colors';
 import { CURB, streetBarrios, streetsOf, ZEBRA, ZEBRA_DEPTH, ZEBRA_MID, type Streets } from './streets';
 import { phaseAt, type Phase } from './time';
+import { streetsLevel } from '../game/streets';
 
 // Cuánto se llena la ciudad según la hora. De noche queda poca gente en la calle.
 const SHARE: Record<Phase, number> = { dia: 1, atardecer: 0.75, noche: 0.4 };
@@ -123,6 +125,9 @@ const gridKey = (g: Grid) =>
 export class Traffic {
   private net: Network | null = null;
   private homes = new Map<string, Home>();
+  private streetOf: (x: number, y: number) => string | null = () => null;
+  // Cuánto se usa cada avenida: 1 menos la parte de su largo que está rota.
+  private use = new Map<Lane, number>();
   private source: { lots: Grid['lots']; works: Grid['works']; key: string } | null = null;
   private cars: Car[] = [];
   private people: Walker[] = [];
@@ -145,6 +150,7 @@ export class Traffic {
       if (key !== this.source?.key) {
         this.net = buildNetwork(streetsOf(scene.cols, scene.rows, [...scene.lots, ...scene.works]));
         this.homes = homesOf(this.net, scene);
+        this.streetOf = streetBarrios(scene.cols, scene.rows, scene.lots, scene.barrios);
         this.cars = [];
         this.people = [];
         fresh = true;
@@ -154,7 +160,22 @@ export class Traffic {
     const net = this.net!;
 
     const share = this.still ? 0 : SHARE[phaseAt(new Date(), scene.timezone)];
-    const carTarget = Math.round(Math.min(MAX_CARS, net.laneTiles / TILES_PER_CAR) * share);
+    // Una avenida pierde autos según cuánto de su largo está roto.
+    const broken = new Set(
+      scene.barrios.filter((b) => b.streets !== undefined && streetsLevel(b.streets) === 'rotas').map((b) => b.id),
+    );
+    let usable = 0;
+    for (const lane of net.lanes) {
+      let bad = 0;
+      for (let i = 0; i < lane.length; i++) {
+        const id = lane.axis === 'h' ? this.streetOf(i, lane.line) : this.streetOf(lane.line, i);
+        if (id && broken.has(id)) bad++;
+      }
+      const use = 1 - bad / lane.length;
+      this.use.set(lane, use);
+      usable += lane.length * use;
+    }
+    const carTarget = Math.round(Math.min(MAX_CARS, usable / TILES_PER_CAR) * share);
     const walkerTargets = new Map<string, number>();
     for (const barrio of scene.barrios) {
       const home = this.homes.get(barrio.id);
@@ -203,9 +224,11 @@ export class Traffic {
 
   // `inside`: en algún lugar de la avenida (al abrir el mapa); si no, entrando por el borde.
   private spawnCar(inside: boolean): boolean {
-    const lanes = this.net?.lanes ?? [];
+    // Se elige la avenida según cuánto se usa: por una rota entera no entra nadie.
+    const lanes = (this.net?.lanes ?? []).filter((l) => (this.use.get(l) ?? 1) > 0);
     if (!lanes.length) return false;
-    const lane = pick(lanes);
+    let r = Math.random() * lanes.reduce((sum, l) => sum + (this.use.get(l) ?? 1), 0);
+    const lane = lanes.find((l) => (r -= this.use.get(l) ?? 1) <= 0) ?? lanes[lanes.length - 1];
     const dir = Math.random() < 0.5 ? 1 : -1;
     const start = dir > 0 ? 0 : -lane.length; // el borde de entrada, contado en su sentido
 

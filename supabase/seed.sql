@@ -31,12 +31,17 @@ begin
     "citizens": { "capacity_per_lot": 10, "consumption_per_day": 2,
                   "weights": { "lotes": 0.3, "calles": 0.3, "abastecimiento": 0.3, "obra": 0.1 },
                   "arrival_rate": 0.30, "departure_rate": 0.15 },
-    "residential": { "capacity_by_level": { "1": 30, "2": 60, "3": 100 } }
+    "residential": { "capacity_by_level": { "1": 30, "2": 60, "3": 100 } },
+    "streets": { "initial": 100, "decay_per_day": 10, "points": 4,
+                 "cost": { "ladrillo": 10 }, "max_per_player_per_day": 1 }
   }$j$::jsonb;
 
   insert into cities(name, config) values ('Ciudad Común · Cohorte 1', cfg) returning id into cid;
-  insert into barrios(city_id, name, ordinal, status, opened_at) values (cid, 'Barrio Fundadores', 1, 'abierto', now()) returning id into b1;
-  insert into barrios(city_id, name, ordinal, status) values (cid, 'Barrio del Río', 2, 'cerrado') returning id into b2;
+  -- Las calles arrancan en el inicial; el reloj del desgaste corre solo en el barrio abierto.
+  insert into barrios(city_id, name, ordinal, status, opened_at, streets_state, streets_updated_at)
+  values (cid, 'Barrio Fundadores', 1, 'abierto', now(), (cfg #>> '{streets,initial}')::numeric, now()) returning id into b1;
+  insert into barrios(city_id, name, ordinal, status, streets_state)
+  values (cid, 'Barrio del Río', 2, 'cerrado', (cfg #>> '{streets,initial}')::numeric) returning id into b2;
 
   for yy in 0..7 loop
     for xx in 0..11 loop

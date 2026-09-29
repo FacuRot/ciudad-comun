@@ -21,6 +21,7 @@ const MESSAGES: Record<string, string> = {
   SELF_GIFT: 'Esto es para ayudar a otros.',
   OTHER_CITY: 'Eso es de otra ciudad.',
   NO_WORK: 'Esa obra ya está terminada.',
+  WORK_NEEDS_MATERIALS: 'La obra ya tiene todas sus jornadas: ahora faltan materiales.',
   LOT_NOT_NEGLECTED: 'Este lote está bien cuidado.',
   CARE_LIMIT: 'Este lote ya recibió todos los cuidados posibles.',
   GIFT_TOO_SMALL: 'El regalo mínimo es de 5 unidades.',

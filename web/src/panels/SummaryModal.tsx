@@ -318,7 +318,8 @@ function progressBefore(contributions: GameEvent[], works: PublicWork[]): Map<st
       ladrillo: acc.ladrillo - Number(p.ladrillo ?? 0),
       madera: acc.madera - Number(p.madera ?? 0),
       energia: acc.energia - Number(p.energia ?? 0),
-      jornadas: acc.jornadas - 1,
+      // Con las jornadas completas un aporte no suma jornada; los eventos viejos no lo dicen y sumaban 1.
+      jornadas: acc.jornadas - Number(p.jornadas ?? 1),
     });
   }
   return before;

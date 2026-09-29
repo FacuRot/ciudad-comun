@@ -53,6 +53,7 @@ export function WorkPanel({ work, onBack }: { work: PublicWork; onBack: () => vo
           missing={{ ladrillo: missing('ladrillo'), madera: missing('madera'), energia: missing('energia') }}
           have={(m) => inventory?.[m] ?? 0}
           jornadas={me.jornadas}
+          jornadasDone={missing('jornadas') === 0}
         />
       )}
 
@@ -79,14 +80,16 @@ function WorkBar({ label, value, total, missing }: { label: string; value: numbe
 }
 
 // Tres campos prellenados con lo que tengo o lo que falta, lo que sea menor.
-// Se puede aportar con los tres en cero: la jornada sola cuenta (docs/05 §5).
+// Mientras falten jornadas se puede aportar con los tres en cero: la jornada sola cuenta.
+// Con las jornadas completas el aporte tiene que llevar algún material (docs/05 §5).
 function ContributeForm(props: {
   work: PublicWork;
   missing: Record<Material, number>;
   have: (m: Material) => number;
   jornadas: number;
+  jornadasDone: boolean;
 }) {
-  const { work, missing, have, jornadas } = props;
+  const { work, missing, have, jornadas, jornadasDone } = props;
   const [draft, setDraft] = useState<Record<Material, number> | null>(null); // null: usar los valores sugeridos
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -94,6 +97,7 @@ function ContributeForm(props: {
   const cap = (m: Material) => Math.min(have(m), missing[m]);
   const suggested = { ladrillo: cap('ladrillo'), madera: cap('madera'), energia: cap('energia') };
   const amounts = draft ?? suggested;
+  const needsMaterials = jornadasDone && amounts.ladrillo + amounts.madera + amounts.energia === 0;
 
   // Al cambiar de obra vuelven los valores sugeridos de esa obra.
   useEffect(() => {
@@ -139,10 +143,14 @@ function ContributeForm(props: {
           </label>
         ))}
       </div>
-      {jornadas < 1 && <p className="error">{new GameError('NO_JORNADAS').message}</p>}
+      {needsMaterials ? (
+        <p className="muted">{new GameError('WORK_NEEDS_MATERIALS').message}</p>
+      ) : (
+        jornadas < 1 && <p className="error">{new GameError('NO_JORNADAS').message}</p>
+      )}
       {error && <p className="error">{error}</p>}
       <div className="row">
-        <button type="button" className="primary" disabled={busy || jornadas < 1} onClick={submit}>
+        <button type="button" className="primary" disabled={busy || jornadas < 1 || needsMaterials} onClick={submit}>
           Aportar (1 jornada)
         </button>
       </div>

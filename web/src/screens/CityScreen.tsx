@@ -12,7 +12,7 @@ import { OtherLotPanel } from '../panels/OtherLotPanel';
 import { WorkPanel } from '../panels/WorkPanel';
 import { BarrioPanel } from '../panels/BarrioPanel';
 import { SummaryModal, type Collected } from '../panels/SummaryModal';
-import { streetsState } from '../game/streets';
+import { streetsLevel, streetsState } from '../game/streets';
 import { InviteModal } from '../panels/InviteModal';
 import { Toasts } from '../panels/Toasts';
 import { gridSize, workPercent, type Cell } from '../game/geo';
@@ -111,14 +111,14 @@ function CityScreen() {
       .filter(Boolean)
       .join(' · ');
 
-    // El estado de las calles de ahora, para dibujarlas (docs/05 §18). Se recalcula con cada
+    // El rango de las calles de ahora, para dibujarlas (docs/05 §18). Se recalcula con cada
     // cambio de la ciudad: el desgaste es lento y solo se ve al cruzar un rango.
     const cfg = configOf(city);
     const scene: Scene = {
       ...gridSize(lots, works),
       lots,
       works,
-      barrios: barrios.map((b) => ({ ...b, streets: streetsState(b, cfg) })),
+      barrios: barrios.map((b) => ({ ...b, streets: streetsLevel(streetsState(b, cfg), cfg.streets) })),
       constructions,
       timezone: city.timezone,
       myLotId: myLot?.id,

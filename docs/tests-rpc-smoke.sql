@@ -1,3 +1,6 @@
+-- HISTÓRICO. Prueba de humo del esquema de partida (docs/schema.sql). No se actualiza:
+-- las pruebas vigentes de cada RPC y cada job están en tests/rpc.sql.
+--
 -- Prueba de humo de las funciones RPC y los jobs.
 -- Requiere una base con schema.sql cargado. En local (supabase start):
 --   psql "$DATABASE_URL" -f tests-rpc-smoke.sql

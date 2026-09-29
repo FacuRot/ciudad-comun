@@ -1,6 +1,6 @@
 # 04 · Modelo de datos
 
-Postgres en Supabase. El SQL ejecutable completo (tablas, índices, RLS, funciones, cron) está en `schema.sql`. Este documento explica el modelo y sus invariantes.
+Postgres en Supabase. El SQL ejecutable completo (tablas, índices, RLS, funciones, cron) está en `supabase/migrations/`; `schema.sql` es el esquema de partida y ya no se actualiza. Este documento explica el modelo y sus invariantes.
 
 ## Diagrama
 

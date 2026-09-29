@@ -228,7 +228,7 @@ function buildLines(
   // 7. Si las calles del barrio propio están gastadas o rotas ahora, un aviso con lo que cuesta mantenerlas.
   if (myBarrio?.status === 'abierto') {
     const state = streetsState(myBarrio, cfg);
-    const level = streetsLevel(state);
+    const level = streetsLevel(state, cfg.streets);
     const cost = cfg.materials.types
       .filter((m) => (cfg.streets.cost[m] ?? 0) > 0)
       .map((m) => `${cfg.streets.cost[m]} de ${MATERIAL_LABEL[m]}`);

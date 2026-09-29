@@ -450,7 +450,9 @@ select pg_temp.as_user('11111111-1111-1111-1111-111111111111');
 update events set created_at = created_at - interval '1 day'
  where type = 'streets.maintained' and actor_id = '11111111-1111-1111-1111-111111111111';
 select pg_temp.ok((maintain_streets(pg_temp.barrio(1))).streets_state = 54, 'el tope se renueva con el día del juego');
-select pg_temp.ok((invitation_map(pg_temp.tok()))->'barrios'->0 ? 'streets', 'invitation_map trae el estado de las calles');
+select pg_temp.ok((invitation_map(pg_temp.tok()))->'barrios'->0 ? 'streets'
+                  and (invitation_map(pg_temp.tok()))->'streets' = '{"worn_below": 70, "broken_below": 40}',
+                  'invitation_map trae el estado de las calles y sus rangos');
 
 -- ---------------------------------------------------------------------
 -- Admin, invitaciones y NO_PLAYER

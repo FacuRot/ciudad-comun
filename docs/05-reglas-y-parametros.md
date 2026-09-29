@@ -248,7 +248,8 @@ Todos son idempotentes: correrlos dos veces no produce efectos dobles. `update_p
                 "arrival_rate": 0.30, "departure_rate": 0.15 },
   "residential": { "capacity_by_level": { "1": 30, "2": 60, "3": 100 } },
   "streets": { "initial": 100, "decay_per_day": 10, "points": 4,
-               "cost": { "ladrillo": 10 }, "max_per_player_per_day": 1 }
+               "cost": { "ladrillo": 10 }, "max_per_player_per_day": 1,
+               "worn_below": 70, "broken_below": 40 }
 }
 ```
 
@@ -410,6 +411,8 @@ Cada barrio tiene un estado de calles de 0 a 100. Baja solo con los días, y lo 
 | Buenas | 70–100 | Como hoy |
 | Gastadas | 40–69 | Grietas y algún bache |
 | Rotas | 0–39 | Baches y pocos autos |
+
+Los rangos se miran sobre el estado redondeado y viven en la config: `streets.worn_below` (70) y `streets.broken_below` (40). Solo nombran y dibujan; ninguna regla depende de ellos.
 
 Una celda de calle pertenece al barrio que tiene más lotes en las ocho celdas que la rodean, y se dibuja con el estado de ese barrio. Si empatan —pasa en la avenida del medio, entre los dos barrios—, es del barrio de menor número.
 

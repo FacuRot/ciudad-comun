@@ -10,7 +10,7 @@ import { formatRemaining } from '../game/format';
 import type { Layout } from './layout';
 import { ABANDONED, darken, desaturate, lighten, lotColor, mix } from './colors';
 import { CURB, streetBarrios, streetsOf, ZEBRA } from './streets';
-import { streetsLevel, type StreetsLevel } from '../game/streets';
+import type { StreetsLevel } from '../types/game';
 import { phaseAt, type Phase } from './time';
 import type { Traffic } from './traffic';
 
@@ -343,9 +343,7 @@ function drawStreets(ctx: CanvasRenderingContext2D, layout: Layout, scene: Scene
 
   // Desgaste (docs/05 §18): cada celda se dibuja con el estado de las calles de su barrio.
   const owner = streetBarrios(cols, rows, scene.lots, scene.barrios);
-  const levelOf = new Map(
-    scene.barrios.map((b) => [b.id, b.streets === undefined ? 'buenas' : streetsLevel(b.streets)] as const),
-  );
+  const levelOf = new Map(scene.barrios.map((b) => [b.id, b.streets ?? 'buenas'] as const));
   for (const c of cells) {
     const id = owner(c.x, c.y);
     const level = id ? levelOf.get(id) : undefined;

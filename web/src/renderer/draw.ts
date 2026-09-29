@@ -81,6 +81,7 @@ const SHAPE: Record<BuildingType, { w: number; d: number; h: number; step: numbe
   aserradero: { w: 0.62, d: 0.34, h: 0.14, step: 0.045 }, // galpón
   generador: { w: 0.5, d: 0.28, h: 0.18, step: 0.075 }, // usina angosta y alta
   plaza: { w: 0.6, d: 0, h: 0, step: 0 },
+  residencial: { w: 0.42, d: 0.24, h: 0.2, step: 0.1 }, // departamentos: el más angosto y el más alto
 };
 
 function roundRect(
@@ -814,6 +815,7 @@ function drawBuilding(
   if (type === 'ladrilleria') drawLadrilleria(ctx, b, t, color, activo, now, seed);
   if (type === 'aserradero') drawAserradero(ctx, b, t, color);
   if (type === 'generador') drawGenerador(ctx, b, t, color);
+  if (type === 'residencial') drawResidencial(ctx, b, t, color, level);
   drawPlinth(ctx, b, color);
   drawDoor(ctx, b, color, type === 'aserradero');
   drawFrontWindows(ctx, level, b, color);
@@ -952,6 +954,73 @@ function drawGenerador(ctx: CanvasRenderingContext2D, b: Box, t: number, color: 
 
   drawStack(ctx, b, t, color, 0.08, 0.5, b.w * 0.15, t * 0.1);
   drawStack(ctx, b, t, color, 0.76, 0.5, b.w * 0.15, t * 0.13);
+}
+
+// Residencial: edificio de departamentos con un piso de balcones por nivel a los
+// costados del frente (la puerta queda libre en el medio) y el tanque de agua en la losa.
+function drawResidencial(ctx: CanvasRenderingContext2D, b: Box, t: number, color: string, level: number) {
+  volume(ctx, b, t, color, true);
+
+  // La banda de arriba es la de las ventanas de siempre; debajo, un piso por nivel.
+  const band = fasciaOf(b) * 1.8 + b.h * 0.08 + Math.min(b.w * 0.14, b.h * 0.24) * 1.4;
+  const floor = (b.h - band) / (level + 1);
+  const bw = b.w * 0.3;
+  const rail = Math.max(1, t * 0.012);
+  onFront(ctx, b, () => {
+    for (let i = 1; i <= level; i++) {
+      const y = band + floor * i; // el piso del balcón
+      for (const x of [b.w * 0.05, b.w * 0.65]) {
+        // Puerta-ventana del departamento, detrás de la baranda.
+        ctx.fillStyle = mix(GLASS, darken(color, 0.4), 0.45);
+        ctx.fillRect(x + bw * 0.2, y - floor * 0.72, bw * 0.6, floor * 0.72);
+        // Losa del balcón y baranda con sus barrotes.
+        ctx.fillStyle = lighten(color, 0.34);
+        ctx.fillRect(x, y - rail, bw, rail * 1.6);
+        ctx.fillStyle = darken(color, 0.5);
+        ctx.fillRect(x, y - floor * 0.4, bw, rail * 0.8);
+        for (let k = 0; k <= 4; k++) ctx.fillRect(x + ((bw - rail * 0.6) * k) / 4, y - floor * 0.4, rail * 0.6, floor * 0.4);
+      }
+    }
+  });
+
+  drawTank(ctx, b, t, 0.66, 0.5);
+}
+
+// Tanque de agua sobre la losa: un cilindro visto de frente, parado en dos patas.
+function drawTank(ctx: CanvasRenderingContext2D, b: Box, t: number, u: number, v: number) {
+  const ov = eaveOf(b);
+  const w = b.w * 0.26;
+  const x = b.x - ov + (b.w + ov * 2) * u - w / 2;
+  const base = b.y - b.h - b.d * (1 - v);
+  const legs = t * 0.03;
+  const h = t * 0.07;
+  const cap = w * 0.3; // la tapa, vista desde arriba
+
+  ctx.save();
+  ctx.fillStyle = 'rgba(38, 32, 24, 0.16)';
+  ctx.fillRect(x + w * 0.3, base - cap * 0.3, w, cap * 0.5);
+
+  ctx.strokeStyle = '#6c7174';
+  ctx.lineWidth = Math.max(1, t * 0.012);
+  ctx.beginPath();
+  ctx.moveTo(x + w * 0.2, base);
+  ctx.lineTo(x + w * 0.2, base - legs);
+  ctx.moveTo(x + w * 0.8, base);
+  ctx.lineTo(x + w * 0.8, base - legs);
+  ctx.stroke();
+
+  ctx.lineWidth = Math.max(1, t * 0.014);
+  ctx.strokeStyle = '#5e6366';
+  ctx.fillStyle = '#b9c1c5';
+  roundRect(ctx, x, base - legs - h, w, h, [0, 0, w * 0.12, w * 0.12]);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = '#dde3e6';
+  ctx.beginPath();
+  ctx.ellipse(x + w / 2, base - legs - h, w / 2, cap / 2, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
 }
 
 // Plaza: el lote no se edifica. Cantero con camino, un kiosco en el medio y un árbol por nivel.

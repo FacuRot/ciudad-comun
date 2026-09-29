@@ -1,7 +1,7 @@
 // Ciudadanos vistos desde el cliente (docs/05-reglas-y-parametros.md §16), con la misma
 // cuenta que fx_barrio_capacity y fx_barrio_attractiveness. Solo sirve para mostrar:
 // la población la mueve el servidor una vez por día.
-import { effectiveRate } from './production';
+import { lotRate } from './production';
 import type { Barrio, CityConfig, Lot, PublicWork } from '../types/game';
 
 export type FactorKey = 'lotes' | 'calles' | 'abastecimiento' | 'obra';
@@ -18,16 +18,27 @@ export type Attractiveness = {
 
 const round4 = (n: number) => Math.round(n * 10_000) / 10_000;
 
+// Lo que aloja un lote con edificio: 10, o lo del nivel si es residencial (§16.1 y §17).
+// Durante una mejora cuenta el nivel que tiene, que es el anterior.
+export function lotCapacity(lot: Lot, cfg: CityConfig): number {
+  if (lot.level === 0) return 0;
+  if (lot.building_type === 'residencial') return cfg.residential.capacity_by_level[String(lot.level)] ?? 0;
+  return cfg.citizens.capacity_per_lot;
+}
+
 // Lo que alojan los lotes del barrio con edificio de nivel 1 o más (§16.1).
 export function barrioCapacity(barrioId: string, lots: Lot[], cfg: CityConfig): number {
-  return lots.filter((l) => l.barrio_id === barrioId && l.level > 0).length * cfg.citizens.capacity_per_lot;
+  return lots.filter((l) => l.barrio_id === barrioId).reduce((sum, l) => sum + lotCapacity(l, cfg), 0);
 }
 
 // Producción del barrio por día, de cualquier material: lo que mide el abastecimiento.
+// Con la tasa de §3 y sin el alquiler de los residenciales (§17.1).
 export function barrioSupplyPerDay(barrioId: string, lots: Lot[], works: PublicWork[], cfg: CityConfig): number {
   let perHour = 0;
   for (const lot of lots) {
-    if (lot.barrio_id === barrioId && lot.level > 0) perHour += effectiveRate(lot, lots, works, cfg).total;
+    if (lot.barrio_id === barrioId && lot.level > 0 && lot.building_type !== 'residencial') {
+      perHour += lotRate(lot, lots, works, cfg).total;
+    }
   }
   return perHour * 24;
 }

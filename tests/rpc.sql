@@ -341,6 +341,53 @@ select pg_temp.ok((fx_barrio_attractiveness(pg_temp.barrio(1)))->>'main_reason' 
                   'con la Escuela terminada y todo en orden, atractivo 1 y ningún motivo');
 
 -- ---------------------------------------------------------------------
+-- Residencial y alquiler
+-- ---------------------------------------------------------------------
+-- B, en (1,0) y sin edificio, construye un residencial que cobra en madera.
+select pg_temp.as_user('22222222-2222-2222-2222-222222222222');
+update inventories set ladrillo = 100, madera = 100, energia = 100 where player_id = '22222222-2222-2222-2222-222222222222';
+select pg_temp.err($$select build('residencial')$$, 'RENT_MATERIAL');
+select pg_temp.err($$select build('generador', 'ladrillo')$$, 'RENT_MATERIAL');
+select build('residencial', 'madera');
+select pg_temp.ok((select rent_material = 'madera' from lots where x = 1 and y = 0),
+                  'build guarda el material del alquiler al iniciar el nivel 1');
+select pg_temp.ok((select payload @> '{"building_type": "residencial", "rent_material": "madera"}' from events
+                    where type = 'construction.started' and actor_id = '22222222-2222-2222-2222-222222222222'),
+                  'construction.started lleva el material del alquiler');
+select pg_temp.ok(fx_barrio_capacity(pg_temp.barrio(1)) = 20, 'un residencial en obra todavía no aloja a nadie');
+update constructions set ends_at = now() - interval '1 minute' where completed_at is null;
+select job_complete_constructions();
+select pg_temp.ok(fx_barrio_capacity(pg_temp.barrio(1)) = 50, 'el residencial nivel 1 aloja 30');
+
+-- Con 50 ciudadanos el barrio consume 100 por día y produce 2,53 × 24 = 60,72 (el alquiler no cuenta):
+-- abastecimiento 0,6072 y atractivo 0,3 + 0,3 + 0,3 × 0,6072 + 0,1 = 0,8822.
+update barrios set population = 50 where ordinal = 1;
+select pg_temp.ok((select fx_lot_rate(l) = 2.3 from lots l where x = 1 and y = 0), 'la tasa de §3 del residencial: 2 × 1.15');
+select pg_temp.ok(((fx_barrio_attractiveness(pg_temp.barrio(1)))->'factors'->>'abastecimiento')::numeric = 0.6072
+                  and ((fx_barrio_attractiveness(pg_temp.barrio(1)))->>'attractiveness')::numeric = 0.8822,
+                  'el alquiler no cuenta para el abastecimiento');
+select pg_temp.ok((select fx_effective_rate(l) = 2.3 * 0.8822 from lots l where x = 1 and y = 0),
+                  'el alquiler rinde la tasa de §3 por el atractivo');
+update lots set production_collected_at = now() - interval '10 hours' where x = 1 and y = 0;
+select pg_temp.ok((heartbeat())->'collected' = '{"material": "madera", "amount": 20, "attractiveness": 0.8822}'::jsonb,
+                  'el alquiler se cobra en el material elegido: 10 h × 2,03/h, con el atractivo');
+select pg_temp.ok((select madera = 110 from inventories where player_id = '22222222-2222-2222-2222-222222222222'),
+                  'el alquiler entra al inventario: 100 − 10 del nivel 1 + 20');
+select pg_temp.ok((select payload->>'attractiveness' = '0.8822' from events
+                    where type = 'production.collected' and actor_id = '22222222-2222-2222-2222-222222222222'),
+                  'production.collected del residencial lleva el atractivo');
+
+-- Mejoras: el material puede venir vacío o igual; distinto, no.
+select pg_temp.err($$select build('residencial', 'ladrillo')$$, 'RENT_MATERIAL');
+select build('residencial');
+select pg_temp.ok(fx_barrio_capacity(pg_temp.barrio(1)) = 50, 'durante la mejora cuenta el nivel anterior');
+update constructions set ends_at = now() - interval '1 minute' where completed_at is null;
+select job_complete_constructions();
+select pg_temp.ok(fx_barrio_capacity(pg_temp.barrio(1)) = 80
+                  and (select rent_material = 'madera' from lots where x = 1 and y = 0),
+                  'el residencial nivel 2 aloja 60 y sigue cobrando en madera');
+
+-- ---------------------------------------------------------------------
 -- Admin, invitaciones y NO_PLAYER
 -- ---------------------------------------------------------------------
 select pg_temp.as_user('11111111-1111-1111-1111-111111111111');

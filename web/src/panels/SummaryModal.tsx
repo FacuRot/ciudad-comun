@@ -4,13 +4,14 @@
 import { useState, type ReactNode } from 'react';
 import { useCity } from '../store/city';
 import { workAmounts, workPercent } from '../game/geo';
-import { BUILDING_LABEL, MATERIAL_LABEL, plural, reasonText } from '../game/format';
+import { BUILDING_LABEL, MATERIAL_LABEL, formatPercent, plural, reasonText } from '../game/format';
 import type { FactorKey } from '../game/citizens';
 import type { BuildingType, GameEvent, MapBarrio, Material, PublicWork, WorkAmounts } from '../types/game';
 
 const MAX_LINES = 8;
 
-export type Collected = { material?: Material; amount?: number };
+// Lo que recogió heartbeat al entrar. Con attractiveness si fue el alquiler de un residencial.
+export type Collected = { material?: Material; amount?: number; attractiveness?: number };
 
 export function SummaryModal({
   events,
@@ -208,6 +209,24 @@ function buildLines(
     });
   }
 
+  // 7. Al dueño de un residencial, cuánto rindió el alquiler: el atractivo con que se cobró.
+  // Reemplaza a "Recogiste" (línea 10).
+  const rent = collected.attractiveness !== undefined;
+  if (rent && collected.material && collected.amount) {
+    lines.push({
+      key: 'rent',
+      node: (
+        <>
+          Tu <strong>residencial</strong> rindió al <strong>{formatPercent(Math.round(collected.attractiveness! * 100) / 100)}</strong>: cobraste{' '}
+          <strong>
+            {collected.amount} de {MATERIAL_LABEL[collected.material]}
+          </strong>
+          .
+        </>
+      ),
+    });
+  }
+
   // 8. Vecinos nuevos cerca.
   const newcomers = unique(of('player.joined').map((e) => String(payload(e).display_name ?? nameOf(e.actor_id))));
   if (newcomers.length > 0) {
@@ -234,8 +253,8 @@ function buildLines(
     });
   }
 
-  // 10. Lo que se recogió al entrar.
-  if (collected.material && collected.amount) {
+  // 10. Lo que se recogió al entrar (el alquiler ya va en la línea 7).
+  if (!rent && collected.material && collected.amount) {
     lines.push({
       key: 'collected',
       node: (

@@ -15,8 +15,10 @@ import {
   formatRemaining,
   plural,
 } from '../game/format';
-import { effectiveRate, producersOf, scarceMaterial } from '../game/production';
+import { barrioAttractiveness, lotCapacity } from '../game/citizens';
+import { effectiveRate, materialOf, producersOf, scarceMaterial } from '../game/production';
 import { configOf, type BuildingType, type CityConfig, type Construction, type Inventory, type Lot, type Material } from '../types/game';
+import { AttractivenessFactors } from './AttractivenessFactors';
 
 type Names = Map<string, string>;
 
@@ -157,10 +159,12 @@ function LotColor({ lot, palette }: { lot: Lot; palette: string[] }) {
 }
 
 // Edificio actual y su tasa efectiva con desglose ("2/h base · +10 % plaza vecina").
+// El residencial muestra además cuántos aloja y el atractivo del que depende su alquiler.
 function Building({ lot, snapshot, cfg }: { lot: Lot; snapshot: CitySnapshot; cfg: CityConfig }) {
   const type = lot.building_type!;
-  const rate = effectiveRate(lot, snapshot.lots, snapshot.works, cfg);
+  const rate = effectiveRate(lot, snapshot.lots, snapshot.works, snapshot.barrios, cfg);
   const work = snapshot.works.find((w) => w.barrio_id === lot.barrio_id);
+  const residential = type === 'residencial';
   const parts = [`${formatNumber(rate.base)}/h base`];
   if (rate.plazaBonus > 0) {
     const plazas = Math.round(rate.plazaBonus / cfg.production.plaza_bonus);
@@ -168,6 +172,7 @@ function Building({ lot, snapshot, cfg }: { lot: Lot; snapshot: CitySnapshot; cf
   }
   if (rate.workBonus > 0) parts.push(`+${formatPercent(rate.workBonus)} ${work?.name ?? 'obra del barrio'}`);
   if (rate.stateFactor !== 1) parts.push(`−${formatPercent(1 - rate.stateFactor)} ${lot.state}`);
+  if (residential && rate.stateFactor > 0) parts.push(`× ${formatPercent(rate.attractiveness)} de atractivo`);
 
   return (
     <section>
@@ -177,7 +182,7 @@ function Building({ lot, snapshot, cfg }: { lot: Lot; snapshot: CitySnapshot; cf
       {rate.material ? (
         <>
           <p className="rate">
-            {formatNumber(rate.total)} de {MATERIAL_LABEL[rate.material]} por hora
+            {formatNumber(rate.total)} de {MATERIAL_LABEL[rate.material]} por hora{residential && ' de alquiler'}
           </p>
           <p className="muted">{parts.join(' · ')}</p>
         </>
@@ -186,7 +191,23 @@ function Building({ lot, snapshot, cfg }: { lot: Lot; snapshot: CitySnapshot; cf
           La plaza no produce: suma +{formatPercent(cfg.production.plaza_bonus)} a cada lote pegado.
         </p>
       )}
+      {residential && <Rent lot={lot} snapshot={snapshot} cfg={cfg} />}
     </section>
+  );
+}
+
+// Cuántos aloja el residencial y el atractivo del barrio, que es lo que mueve el alquiler (docs/05 §17.2).
+function Rent({ lot, snapshot, cfg }: { lot: Lot; snapshot: CitySnapshot; cfg: CityConfig }) {
+  const barrio = snapshot.barrios.find((b) => b.id === lot.barrio_id);
+  if (!barrio) return null;
+  const attractiveness = barrioAttractiveness(barrio, snapshot.lots, snapshot.works, cfg);
+  const work = snapshot.works.find((w) => w.barrio_id === lot.barrio_id);
+  return (
+    <>
+      <p>Aloja {plural(lotCapacity(lot, cfg), 'ciudadano', 'ciudadanos')}.</p>
+      <p className="label">Atractivo del barrio: {formatPercent(attractiveness.value)}</p>
+      <AttractivenessFactors attractiveness={attractiveness} workName={work?.name} />
+    </>
   );
 }
 
@@ -200,6 +221,7 @@ function BuildForm(props: {
 }) {
   const { lot, snapshot, cfg, inventory, jornadas, names } = props;
   const [picked, setPicked] = useState<BuildingType | null>(null);
+  const [rent, setRent] = useState<Material | null>(null); // material del alquiler, si elige residencial
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -210,16 +232,18 @@ function BuildForm(props: {
   const have = (m: Material) => inventory?.[m] ?? 0;
   const needed = cfg.materials.types.filter((m) => next.cost[m] > 0);
   const missing = needed.filter((m) => have(m) < next.cost[m]);
-  // Lo que produce el propio lote llega solo: a los vecinos se les pide el resto.
-  const own = lot.level > 0 && lot.building_type ? cfg.buildings.produces[lot.building_type] : null;
+  // Lo que produce el propio lote (o cobra de alquiler) llega solo: a los vecinos se les pide el resto.
+  const own = lot.level > 0 ? materialOf(lot, cfg) : null;
   const toAsk = missing.filter((m) => m !== own);
+  // El nivel 1 de un residencial no se construye sin elegir el material del alquiler.
+  const needsRent = first && type === 'residencial';
 
   const submit = async () => {
-    if (!type) return;
+    if (!type || (needsRent && !rent)) return;
     setBusy(true);
     setError(null);
     try {
-      await build(type); // al aparecer la construcción, este formulario se desmonta
+      await build(type, needsRent ? rent! : undefined); // al aparecer la construcción, este formulario se desmonta
     } catch (err) {
       setError(messageOf(err));
       setBusy(false);
@@ -234,7 +258,11 @@ function BuildForm(props: {
           <p>
             En tu barrio escasea:{' '}
             <strong>
-              {MATERIAL_LABEL[scarceMaterial(lot.barrio_id, snapshot.lots, snapshot.works, snapshot.constructions, cfg)]}
+              {
+                MATERIAL_LABEL[
+                  scarceMaterial(lot.barrio_id, snapshot.lots, snapshot.works, snapshot.barrios, snapshot.constructions, cfg)
+                ]
+              }
             </strong>
           </p>
           <div className="types" role="radiogroup" aria-label="Tipo de edificio">
@@ -255,15 +283,25 @@ function BuildForm(props: {
                   <small>
                     {produces
                       ? `produce ${MATERIAL_LABEL[produces]}`
-                      : `+${formatPercent(cfg.production.plaza_bonus)} a los vecinos`}
+                      : t === 'residencial'
+                        ? `aloja ${cfg.residential.capacity_by_level['1']} y cobra alquiler`
+                        : `+${formatPercent(cfg.production.plaza_bonus)} a los vecinos`}
                   </small>
                 </button>
               );
             })}
           </div>
+          {needsRent && <RentPicker lot={lot} snapshot={snapshot} cfg={cfg} rent={rent} onPick={setRent} />}
         </>
       ) : (
-        <h3>Mejorar a nivel {target}</h3>
+        <>
+          <h3>Mejorar a nivel {target}</h3>
+          {lot.building_type === 'residencial' && (
+            <p className="muted">
+              Va a alojar {plural(cfg.residential.capacity_by_level[String(target)] ?? 0, 'ciudadano', 'ciudadanos')}.
+            </p>
+          )}
+        </>
       )}
 
       <p className="label">Cuesta</p>
@@ -282,7 +320,7 @@ function BuildForm(props: {
         <button
           type="button"
           className="primary"
-          disabled={busy || !type || missing.length > 0 || jornadas < 1}
+          disabled={busy || !type || (needsRent && !rent) || missing.length > 0 || jornadas < 1}
           onClick={submit}
         >
           {first ? 'Construir' : 'Mejorar'} (1 jornada, {formatHours(next.hours)})
@@ -308,6 +346,44 @@ function BuildForm(props: {
         </div>
       )}
     </section>
+  );
+}
+
+// "¿Qué vas a cobrar de alquiler?" (docs/07, panel Mi lote), con cuánto rendiría hoy.
+function RentPicker(props: {
+  lot: Lot;
+  snapshot: CitySnapshot;
+  cfg: CityConfig;
+  rent: Material | null;
+  onPick: (m: Material) => void;
+}) {
+  const { lot, snapshot, cfg, rent, onPick } = props;
+  // El mismo lote con el residencial ya hecho: la tasa sale de la misma cuenta que usa el servidor.
+  const built: Lot = { ...lot, building_type: 'residencial', level: 1, rent_material: rent ?? cfg.materials.types[0] };
+  const rate = effectiveRate(built, snapshot.lots, snapshot.works, snapshot.barrios, cfg);
+
+  return (
+    <>
+      <p className="label">¿Qué vas a cobrar de alquiler?</p>
+      <div className="types" role="radiogroup" aria-label="Material del alquiler">
+        {cfg.materials.types.map((m) => (
+          <button
+            type="button"
+            key={m}
+            role="radio"
+            aria-checked={m === rent}
+            className={m === rent ? 'type on' : 'type'}
+            onClick={() => onPick(m)}
+          >
+            <span>{MATERIAL_LABEL[m]}</span>
+          </button>
+        ))}
+      </div>
+      <p className="muted">
+        Aloja {cfg.residential.capacity_by_level['1']} ciudadanos. El alquiler rinde según el atractivo del barrio: hoy{' '}
+        {formatPercent(rate.attractiveness)}, unos {formatNumber(rate.total)} por hora.
+      </p>
+    </>
   );
 }
 

@@ -435,6 +435,7 @@ export type Database = {
           name: string | null
           owner_id: string | null
           production_collected_at: string | null
+          rent_material: Database["public"]["Enums"]["material_t"] | null
           state: Database["public"]["Enums"]["lot_state_t"]
           status: Database["public"]["Enums"]["lot_status_t"]
           x: number
@@ -453,6 +454,7 @@ export type Database = {
           name?: string | null
           owner_id?: string | null
           production_collected_at?: string | null
+          rent_material?: Database["public"]["Enums"]["material_t"] | null
           state?: Database["public"]["Enums"]["lot_state_t"]
           status?: Database["public"]["Enums"]["lot_status_t"]
           x: number
@@ -471,6 +473,7 @@ export type Database = {
           name?: string | null
           owner_id?: string | null
           production_collected_at?: string | null
+          rent_material?: Database["public"]["Enums"]["material_t"] | null
           state?: Database["public"]["Enums"]["lot_state_t"]
           status?: Database["public"]["Enums"]["lot_status_t"]
           x?: number
@@ -700,7 +703,10 @@ export type Database = {
       }
       admin_pending_notifications: { Args: { p_limit?: number }; Returns: Json }
       build: {
-        Args: { p_building_type: Database["public"]["Enums"]["building_t"] }
+        Args: {
+          p_building_type: Database["public"]["Enums"]["building_t"]
+          p_rent_material?: Database["public"]["Enums"]["material_t"]
+        }
         Returns: {
           building_type: Database["public"]["Enums"]["building_t"]
           completed_at: string | null
@@ -732,6 +738,7 @@ export type Database = {
           name: string | null
           owner_id: string | null
           production_collected_at: string | null
+          rent_material: Database["public"]["Enums"]["material_t"] | null
           state: Database["public"]["Enums"]["lot_state_t"]
           status: Database["public"]["Enums"]["lot_status_t"]
           x: number
@@ -765,6 +772,7 @@ export type Database = {
           name: string | null
           owner_id: string | null
           production_collected_at: string | null
+          rent_material: Database["public"]["Enums"]["material_t"] | null
           state: Database["public"]["Enums"]["lot_state_t"]
           status: Database["public"]["Enums"]["lot_status_t"]
           x: number
@@ -822,6 +830,10 @@ export type Database = {
           p_type: string
         }
         Returns: undefined
+      }
+      fx_lot_rate: {
+        Args: { p_lot: Database["public"]["Tables"]["lots"]["Row"] }
+        Returns: number
       }
       fx_lot_state: {
         Args: { p_lot: Database["public"]["Tables"]["lots"]["Row"] }
@@ -935,7 +947,12 @@ export type Database = {
     }
     Enums: {
       barrio_status_t: "cerrado" | "abierto"
-      building_t: "ladrilleria" | "aserradero" | "generador" | "plaza"
+      building_t:
+        | "ladrilleria"
+        | "aserradero"
+        | "generador"
+        | "plaza"
+        | "residencial"
       lot_state_t: "activo" | "descuidado" | "abandonado"
       lot_status_t: "cerrado" | "libre" | "ocupado"
       material_t: "ladrillo" | "madera" | "energia"
@@ -1068,7 +1085,13 @@ export const Constants = {
   public: {
     Enums: {
       barrio_status_t: ["cerrado", "abierto"],
-      building_t: ["ladrilleria", "aserradero", "generador", "plaza"],
+      building_t: [
+        "ladrilleria",
+        "aserradero",
+        "generador",
+        "plaza",
+        "residencial",
+      ],
       lot_state_t: ["activo", "descuidado", "abandonado"],
       lot_status_t: ["cerrado", "libre", "ocupado"],
       material_t: ["ladrillo", "madera", "energia"],

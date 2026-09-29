@@ -58,7 +58,8 @@ export async function claimLot(p: {
 export type Heartbeat = {
   hours_away: number;
   since: string;
-  collected: { material?: Material; amount?: number }; // vacío si no había nada para recoger
+  // Vacío si no había nada para recoger. Con attractiveness si fue el alquiler de un residencial.
+  collected: { material?: Material; amount?: number; attractiveness?: number };
   show_summary: boolean;
 };
 
@@ -83,11 +84,14 @@ export async function recolorLot(color: string): Promise<void> {
   useCity.getState().patchMyLot({ color });
 }
 
-// Nivel 1 (elige el tipo) o mejora al siguiente nivel.
-export async function build(type: BuildingType): Promise<Construction> {
-  const { data, error } = await sb.rpc('build', { p_building_type: type });
+// Nivel 1 (elige el tipo) o mejora al siguiente nivel. El residencial pide, en el nivel 1,
+// qué material cobra de alquiler; en las mejoras ya lo tiene el lote.
+export async function build(type: BuildingType, rentMaterial?: Material): Promise<Construction> {
+  const { data, error } = await sb.rpc('build', { p_building_type: type, p_rent_material: rentMaterial });
   if (error) throw new GameError(codeOf(error));
   useCity.getState().applyConstruction(data as Construction);
+  // El lote guardó el material del alquiler: Realtime lo trae igual, pero así el panel no lo espera.
+  if (rentMaterial) useCity.getState().patchMyLot({ rent_material: rentMaterial });
   // Gastó una jornada y materiales (y recogió producción): si la relectura falla, la corrige la próxima.
   await refreshMe().catch(() => {});
   return data as Construction;

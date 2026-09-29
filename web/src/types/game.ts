@@ -66,6 +66,7 @@ export type CityConfig = {
     arrival_rate: number;
     departure_rate: number;
   };
+  residential: { capacity_by_level: Record<string, number> };
 };
 
 export function configOf(city: City): CityConfig {

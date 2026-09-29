@@ -3,24 +3,10 @@
 import { useCity } from '../store/city';
 import { workPercent } from '../game/geo';
 import { effectiveRate, scarceMaterial } from '../game/production';
-import {
-  barrioAttractiveness,
-  barrioCapacity,
-  FACTOR_KEYS,
-  populationTarget,
-  populationTrend,
-} from '../game/citizens';
-import {
-  BUILDING_COUNT,
-  BUILDING_GLYPH,
-  FACTOR_LABEL,
-  MATERIAL_LABEL,
-  formatNumber,
-  formatPercent,
-  plural,
-  reasonText,
-} from '../game/format';
+import { barrioAttractiveness, barrioCapacity, populationTarget, populationTrend } from '../game/citizens';
+import { BUILDING_COUNT, BUILDING_GLYPH, MATERIAL_LABEL, formatNumber, plural } from '../game/format';
 import { configOf, type Barrio, type CityConfig, type Lot, type Material, type PublicWork } from '../types/game';
+import { AttractivenessFactors } from './AttractivenessFactors';
 import { PanelBack } from './PanelBack';
 
 export function BarrioPanel({
@@ -34,7 +20,7 @@ export function BarrioPanel({
 }) {
   const snapshot = useCity((s) => s.snapshot)!;
   const cfg = configOf(snapshot.city);
-  const { lots, works, constructions } = snapshot;
+  const { lots, works, barrios, constructions } = snapshot;
 
   const mine = lots.filter((l) => l.barrio_id === barrio.id);
   const taken = mine.filter((l) => l.status === 'ocupado');
@@ -42,9 +28,10 @@ export function BarrioPanel({
   const work = works.find((w) => w.barrio_id === barrio.id) ?? null;
 
   // Producción por hora del barrio entero, con la misma cuenta que usa el servidor.
+  // Incluye el alquiler de los residenciales, que también es material que llega.
   const production = new Map<Material, number>(cfg.materials.types.map((m) => [m, 0]));
   for (const lot of taken) {
-    const rate = effectiveRate(lot, lots, works, cfg);
+    const rate = effectiveRate(lot, lots, works, barrios, cfg);
     if (rate.material) production.set(rate.material, production.get(rate.material)! + rate.total);
   }
 
@@ -53,7 +40,7 @@ export function BarrioPanel({
     count: taken.filter((l) => l.building_type === t && l.level > 0).length,
   }));
   const empty = taken.filter((l) => l.level === 0).length;
-  const scarce = scarceMaterial(barrio.id, lots, works, constructions, cfg);
+  const scarce = scarceMaterial(barrio.id, lots, works, barrios, constructions, cfg);
 
   return (
     <aside className="panel">
@@ -133,9 +120,17 @@ function Citizens({ barrio, lots, works, cfg }: { barrio: Barrio; lots: Lot[]; w
   const attractiveness = barrioAttractiveness(barrio, lots, works, cfg);
   const target = populationTarget(capacity, attractiveness.value);
   const trend = TREND[populationTrend(barrio.population, target)];
-  const built = lots.filter((l) => l.barrio_id === barrio.id && l.level > 0).length;
+  const built = lots.filter((l) => l.barrio_id === barrio.id && l.level > 0);
+  const residential = built.filter((l) => l.building_type === 'residencial').length;
+  const others = built.length - residential;
   const work = works.find((w) => w.barrio_id === barrio.id);
-  const reason = attractiveness.mainReason;
+  // "24 lotes con edificio y 2 residenciales": los residenciales van aparte porque alojan más.
+  const housing = [
+    others > 0 && plural(others, 'lote con edificio', 'lotes con edificio'),
+    residential > 0 && plural(residential, 'residencial', 'residenciales'),
+  ]
+    .filter(Boolean)
+    .join(' y ');
 
   return (
     <section>
@@ -151,32 +146,10 @@ function Citizens({ barrio, lots, works, cfg }: { barrio: Barrio; lots: Lot[]; w
       </p>
       <p className="muted">
         {capacity > 0
-          ? `Hay lugar para ${formatNumber(capacity)}: ${plural(built, 'lote con edificio', 'lotes con edificio')}.`
+          ? `Hay lugar para ${formatNumber(capacity)}: ${housing}.`
           : `Todavía no vive nadie: cada lote con edificio da lugar a ${cfg.citizens.capacity_per_lot}.`}
       </p>
-      <ul className="factors">
-        {FACTOR_KEYS.map((key) => {
-          const value = attractiveness.factors[key];
-          return (
-            <li key={key} className={key === reason ? 'worst' : undefined}>
-              <span>{key === 'obra' && work ? work.name : FACTOR_LABEL[key]}</span>
-              <span>{formatPercent(value)}</span>
-              <div className="bar">
-                <span style={{ width: `${value * 100}%` }} />
-              </div>
-            </li>
-          );
-        })}
-      </ul>
-      <p>
-        {reason ? (
-          <>
-            Lo que más resta: <strong>{reasonText(reason, work?.name)}</strong>.
-          </>
-        ) : (
-          'No le falta nada.'
-        )}
-      </p>
+      <AttractivenessFactors attractiveness={attractiveness} workName={work?.name} />
     </section>
   );
 }

@@ -9,6 +9,7 @@ export const BUILDING_LABEL: Record<BuildingType, string> = {
   aserradero: 'Aserradero',
   generador: 'Generador',
   plaza: 'Plaza',
+  residencial: 'Residencial',
 };
 
 // Singular y plural en minúscula, para contar ("3 generadores").
@@ -17,6 +18,7 @@ export const BUILDING_COUNT: Record<BuildingType, [string, string]> = {
   aserradero: ['aserradero', 'aserraderos'],
   generador: ['generador', 'generadores'],
   plaza: ['plaza', 'plazas'],
+  residencial: ['residencial', 'residenciales'],
 };
 
 // Glifo del edificio en el mapa y en el panel (docs/07, "El canvas").
@@ -25,6 +27,7 @@ export const BUILDING_GLYPH: Record<BuildingType, string> = {
   aserradero: '▲',
   generador: '⚡︎',
   plaza: '✿',
+  residencial: '⌂',
 };
 
 // Los factores del atractivo (docs/05 §16.2). La obra se nombra con el nombre de la del barrio.

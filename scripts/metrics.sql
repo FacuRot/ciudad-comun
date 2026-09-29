@@ -122,7 +122,7 @@ select p.display_name,
  group by p.display_name
  order by aportes desc, materiales desc;
 
--- Tipos de edificio elegidos (¿alguien elige plaza?).
+-- Tipos de edificio elegidos (¿alguien elige plaza? ¿cuántos residenciales?, docs/05 §15).
 select building_type, level, count(*) as lotes
   from lots where level > 0
  group by building_type, level

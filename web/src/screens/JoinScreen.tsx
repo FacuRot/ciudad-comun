@@ -11,6 +11,7 @@ import { CityCanvas } from '../renderer/CityCanvas';
 import type { LotMark, Scene } from '../renderer/draw';
 import { LOT_COLORS } from '../renderer/colors';
 import { claimableLotIds, gridSize, suggestedLotIds, workPercent, type Cell } from '../game/geo';
+import { streetsLevel } from '../game/streets';
 import type { JoinMap, MapLot } from '../types/game';
 import { Notice } from '../App';
 
@@ -58,7 +59,7 @@ export function JoinScreen({ token }: { token: string }) {
       ...gridSize(map.lots, map.works),
       lots: map.lots,
       works: map.works,
-      barrios: map.barrios,
+      barrios: map.barrios.map((b) => ({ ...b, streets: streetsLevel(b.streets, map.streets) })),
       timezone: map.timezone,
       marks,
       selectedLotId: selectedId,

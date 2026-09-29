@@ -1,4 +1,10 @@
 -- =====================================================================
+--  HISTÓRICO. Es el esquema de partida del 13/09/2026, del que salieron las
+--  primeras migraciones. No se actualiza: el esquema vigente es la suma de
+--  supabase/migrations/ (sin la producción sin pérdida, el panel de admin,
+--  los ciudadanos, el residencial ni las calles, que vinieron después).
+-- =====================================================================
+-- =====================================================================
 --  Ciudad Común · esquema del prototipo (Supabase / Postgres 15+)
 --  Versión 0.2 · 2026-09-13
 --

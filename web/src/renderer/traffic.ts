@@ -13,7 +13,6 @@ import type { Scene } from './draw';
 import { darken, lighten, mix } from './colors';
 import { CURB, streetBarrios, streetsOf, ZEBRA, ZEBRA_DEPTH, ZEBRA_MID, type Streets } from './streets';
 import { phaseAt, type Phase } from './time';
-import { streetsLevel } from '../game/streets';
 
 // Cuánto se llena la ciudad según la hora. De noche queda poca gente en la calle.
 const SHARE: Record<Phase, number> = { dia: 1, atardecer: 0.75, noche: 0.4 };
@@ -161,9 +160,7 @@ export class Traffic {
 
     const share = this.still ? 0 : SHARE[phaseAt(new Date(), scene.timezone)];
     // Una avenida pierde autos según cuánto de su largo está roto.
-    const broken = new Set(
-      scene.barrios.filter((b) => b.streets !== undefined && streetsLevel(b.streets) === 'rotas').map((b) => b.id),
-    );
+    const broken = new Set(scene.barrios.filter((b) => b.streets === 'rotas').map((b) => b.id));
     let usable = 0;
     for (const lane of net.lanes) {
       let bad = 0;

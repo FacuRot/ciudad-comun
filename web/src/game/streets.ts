@@ -1,14 +1,9 @@
 // Calles vistas desde el cliente (docs/05-reglas-y-parametros.md §18), con la misma cuenta
 // que fx_streets_state. Solo sirve para mostrar: el estado lo guarda maintain_streets y el
 // desgaste de ahí en adelante se calcula al leer, igual que en el servidor.
-import type { Barrio, CityConfig } from '../types/game';
+import type { Barrio, CityConfig, StreetsLevel, StreetsRanges } from '../types/game';
 
-export type StreetsLevel = 'buenas' | 'gastadas' | 'rotas';
-
-// Los rangos de la tabla de §18. Solo nombran y dibujan el estado: no mueven ninguna regla,
-// por eso no están en la config.
-const WORN_BELOW = 70;
-const BROKEN_BELOW = 40;
+export type { StreetsLevel };
 
 // El estado de ahora: el guardado menos el desgaste desde entonces, sin bajar de 0.
 // Con el reloj en NULL (barrio cerrado) no se gasta.
@@ -27,9 +22,10 @@ export function shownStreets(state: number): number {
   return Math.round(state);
 }
 
-export function streetsLevel(state: number): StreetsLevel {
+// Los rangos de la tabla de §18 (streets.worn_below y broken_below), sobre lo que se muestra.
+export function streetsLevel(state: number, ranges: StreetsRanges): StreetsLevel {
   const shown = shownStreets(state);
-  return shown < BROKEN_BELOW ? 'rotas' : shown < WORN_BELOW ? 'gastadas' : 'buenas';
+  return shown < ranges.broken_below ? 'rotas' : shown < ranges.worn_below ? 'gastadas' : 'buenas';
 }
 
 // Día del juego (AAAA-MM-DD) de un instante: el tope de mantenimiento se renueva a las

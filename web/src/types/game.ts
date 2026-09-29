@@ -25,18 +25,25 @@ export type MapLot = Pick<
   'id' | 'barrio_id' | 'x' | 'y' | 'status' | 'name' | 'color' | 'building_type' | 'level' | 'state'
 >;
 export type MapWork = Pick<PublicWork, 'id' | 'barrio_id' | 'name' | 'x' | 'y' | 'cost' | 'progress' | 'status'>;
-// `streets`: el estado de las calles de ahora (docs/05 §18). En /join lo calcula el servidor;
-// en /city, el cliente con la config (game/streets.ts).
-export type MapBarrio = Pick<Barrio, 'id' | 'name' | 'ordinal' | 'status' | 'population'> & { streets?: number };
+// Cómo están las calles de un barrio (docs/05 §18). Los rangos vienen de streets.worn_below y broken_below.
+export type StreetsLevel = 'buenas' | 'gastadas' | 'rotas';
 
+// `streets`: el rango de las calles de ahora, para dibujarlas. Lo calcula quien arma la escena
+// con la config (game/streets.ts); sin él, se dibujan buenas.
+export type MapBarrio = Pick<Barrio, 'id' | 'name' | 'ordinal' | 'status' | 'population'> & { streets?: StreetsLevel };
+
+// En /join el servidor manda el estado de las calles de ahora y los rangos de la config.
 export type JoinMap = {
   timezone: string;
   palette: string[];
   max_claim_distance: number;
+  streets: StreetsRanges;
   lots: MapLot[];
-  barrios: MapBarrio[];
+  barrios: (Omit<MapBarrio, 'streets'> & { streets: number })[];
   works: MapWork[];
 };
+
+export type StreetsRanges = { worn_below: number; broken_below: number };
 
 // Forma de cities.config (docs/05-reglas-y-parametros.md §14). Solo lo que usa el cliente.
 export type CityConfig = {
@@ -69,7 +76,7 @@ export type CityConfig = {
     departure_rate: number;
   };
   residential: { capacity_by_level: Record<string, number> };
-  streets: {
+  streets: StreetsRanges & {
     initial: number;
     decay_per_day: number;
     points: number;

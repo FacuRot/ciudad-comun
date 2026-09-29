@@ -228,9 +228,9 @@ function Streets({ barrio, cfg, timezone }: { barrio: Barrio; cfg: CityConfig; t
     <section>
       <h3>Calles</h3>
       <p className="citizens">
-        Estado <strong>{shown}</strong> de 100 · {streetsLevel(state)}
+        Estado <strong>{shown}</strong> de 100 · {streetsLevel(state, s)}
       </p>
-      <div className={`bar streets ${streetsLevel(state)}`}>
+      <div className={`bar streets ${streetsLevel(state, s)}`}>
         <span style={{ width: `${state}%` }} />
       </div>
       <p className="muted">

@@ -14,14 +14,14 @@ Leer en orden la primera vez. Después, cada documento es referencia independien
 | 1 | `01-concepto.md` | Visión del juego completo: frase, fantasía, pilares, economía, ciclo del lote, primera sesión, estética. | Antes de cualquier decisión de diseño. Es la fuente de verdad del "por qué". |
 | 2 | `02-alcance-prototipo.md` | Qué se construye, qué se falsea a mano, qué queda afuera, y la hipótesis que valida el prototipo. | Antes de arrancar y cada vez que el alcance se quiera abrir. |
 | 3 | `03-arquitectura-y-stack.md` | Stack elegido, arquitectura cliente/servidor, decisiones técnicas y su justificación. | Semana 1. |
-| 4 | `04-modelo-de-datos.md` | Tablas, relaciones, invariantes. El SQL ejecutable está en `schema.sql`. | Semana 1, antes de tocar la base. |
+| 4 | `04-modelo-de-datos.md` | Tablas, relaciones, invariantes. El SQL vigente está en `supabase/migrations/`. | Semana 1, antes de tocar la base. |
 | 5 | `05-reglas-y-parametros.md` | Todas las reglas del juego con sus números: jornadas, materiales, edificios, costos, tiempos, decaimiento, obras. | Al implementar cada mecánica. Es el documento de balance. |
 | 6 | `06-acciones-y-api.md` | Contrato de cada acción del jugador (RPC): entradas, validaciones, efectos, eventos que emite. | Al implementar el backend y el cliente. |
 | 7 | `07-pantallas-y-flujos.md` | Pantallas del prototipo, flujo de primera sesión, estados del mapa, qué muestra cada panel. | Al implementar el frontend. |
 | 8 | `08-plan-de-construccion.md` | Plan de 6 semanas con entregables por semana y criterio de "listo". | Para planificar y para saber si el alcance se está abriendo. |
 | 9 | `09-experimento-y-metricas.md` | Cómo se corre la prueba de 3 semanas: reclutamiento, umbrales, consultas SQL de las métricas, rituales diarios, entrevistas de cierre. | Antes de invitar a la primera persona. |
-| — | `schema.sql` | Esquema Postgres completo para Supabase, con funciones RPC y jobs de cron. | Se ejecuta en la semana 1. |
-| — | `tests-rpc-smoke.sql` | Prueba de humo de todas las funciones y jobs contra una base con el esquema cargado. | Después de cada migración. |
+| — | `schema.sql` | **Histórico.** Esquema de partida del 13/09, del que salieron las primeras migraciones. El vigente es `supabase/migrations/`. | Solo como referencia de origen. |
+| — | `tests-rpc-smoke.sql` | **Histórico.** Prueba de humo del esquema de partida. Las pruebas vigentes están en `tests/rpc.sql`. | Solo como referencia de origen. |
 | — | `CLAUDE.md` | Instrucciones para Claude Code dentro del repo del juego. Copiar a la raíz del repo. | Al crear el repo. |
 | — | `concepto.html` | Copia local del documento de concepto publicado (se abre en cualquier navegador). | Para compartir sin depender de Claude. |
 

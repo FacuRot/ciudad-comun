@@ -1,6 +1,7 @@
 -- =====================================================================
---  Bots: 30 jugadores falsos que juegan 3 días simulados
---  (docs/08-plan-de-construccion.md, semana 5).
+--  Bots: 30 jugadores falsos que juegan 10 días simulados
+--  (docs/08-plan-de-construccion.md, semana 5). Son 10 y no 3 para ver si el
+--  Barrio 2 abre por población antes que por tiempo (docs/05 §16.4).
 --
 --  Para qué: ver que nada se rompe con gente encima y que los números de
 --  docs/05-reglas-y-parametros.md §15 dan algo razonable antes de invitar
@@ -49,16 +50,19 @@ begin
 end $fn$;
 
 -- Pasar de día del juego: lo que mira el día (no la hora) también retrocede,
--- y ahí corren los jobs diarios. Cada uno se llama dos veces: son idempotentes.
+-- y ahí corren los jobs diarios en el orden de docs/05 §13. Cada uno se llama
+-- dos veces: son idempotentes.
 create or replace function pg_temp.new_day() returns void language plpgsql as $fn$
 begin
   update lot_visits set day = day - 1;
   update events set payload = jsonb_set(payload, '{day}', to_jsonb(((payload->>'day')::date - 1)::text))
-   where type = 'jornadas.refilled';
+   where type in ('jornadas.refilled', 'barrio.population_changed');
   perform job_refill_jornadas();
   perform job_refill_jornadas();
   perform job_update_lot_states();
   perform job_update_lot_states();
+  perform job_update_population();  -- revisa la apertura al terminar
+  perform job_update_population();
   perform job_check_barrio_opening();
   perform job_check_barrio_opening();
 end $fn$;
@@ -144,7 +148,7 @@ end $fn$;
 do $sim$
 declare
   BOTS        constant int := 30;
-  DAYS        constant int := 3;
+  DAYS        constant int := 10;
   TICKS_A_DAY constant int := 12;          -- un tick son 2 horas
   TICK_LEN    constant interval := interval '2 hours';
   ACT_CHANCE  constant numeric := 0.22;    -- probabilidad de que un bot entre en un tick
@@ -206,7 +210,7 @@ begin
 
   raise notice 'Fundaron % bots.', (select count(*) from players);
 
-  -- Tres días. Cada tick: corre el reloj, terminan las obras que vencieron
+  -- Los días. Cada tick: corre el reloj, terminan las obras que vencieron
   -- y algunos bots entran a jugar.
   for day in 1..DAYS loop
     for tick in 1..TICKS_A_DAY loop
@@ -232,7 +236,17 @@ begin
     end if;
 
     perform pg_temp.new_day();
-    raise notice 'Día % listo.', day;
+    -- Por barrio abierto: población de hoy, objetivo, atractivo, lo que más resta y calles.
+    raise notice 'Día % listo. %', day,
+      (select string_agg(format('%s: %s de %s ciudadanos (capacidad %s, atractivo %s, resta %s) · calles %s',
+                                b.name, e.payload->>'to', e.payload->>'target', e.payload->>'capacity',
+                                e.payload->>'attractiveness', coalesce(e.payload->>'main_reason', 'nada'),
+                                round(fx_streets_state(b.id))), ' | ' order by b.ordinal)
+         from barrios b
+         join lateral (select payload from events
+                        where type = 'barrio.population_changed' and payload->>'barrio_id' = b.id::text
+                        order by created_at desc, id desc limit 1) e on true
+        where b.status = 'abierto');
   end loop;
 
   -- ------------------------------------------------------------------
@@ -256,6 +270,12 @@ begin
     (select round(count(*) filter (where type in ('construction.helped','public_work.contributed','lot.cared','streets.maintained')) * 100.0
                   / nullif(count(*), 0))
        from events where type in ('construction.started','construction.helped','public_work.contributed','lot.cared','streets.maintained'));
+  raise notice 'Barrio 2: %',
+    -- Abre al cerrar un día; de ahí en más su evento envejece un día por día simulado.
+    coalesce((select format('abrió el día %s por %s', DAYS - round(extract(epoch from (now() - e.created_at)) / 86400.0)::int,
+                            e.payload->>'reason')
+                from events e where e.type = 'barrio.opened' order by e.created_at limit 1),
+             'sigue cerrado');
   raise notice 'Calles: % · mantenimientos: % de % jugadores distintos',
     (select string_agg(name || ' ' || round(fx_streets_state(id)), ' · ' order by ordinal) from barrios where status = 'abierto'),
     (select count(*) from events where type = 'streets.maintained'),

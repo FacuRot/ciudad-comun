@@ -1,6 +1,6 @@
 # 06 · Acciones y API
 
-Toda acción del jugador es una llamada `supabase.rpc('<función>', {...})`. Las lecturas van directo a las tablas con `supabase.from(...)` bajo RLS. Este documento es el contrato entre cliente y servidor; la implementación está en `schema.sql`.
+Toda acción del jugador es una llamada `supabase.rpc('<función>', {...})`. Las lecturas van directo a las tablas con `supabase.from(...)` bajo RLS. Este documento es el contrato entre cliente y servidor; la implementación está en `supabase/migrations/`.
 
 ## Convenciones
 

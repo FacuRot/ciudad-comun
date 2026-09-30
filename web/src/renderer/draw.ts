@@ -496,7 +496,7 @@ function drawTree(ctx: CanvasRenderingContext2D, cx: number, baseY: number, size
 
 // --- Terreno del lote --------------------------------------------------
 // El lote construido no se pinta: el edificio se apoya sobre el mapa. Solo se
-// dibuja terreno cuando no hay nada que mostrar todavía.
+// dibuja terreno cuando no hay nada que mostrar todavía, o cuando el lote es una plaza.
 function drawParcel(
   ctx: CanvasRenderingContext2D,
   lot: Lot,
@@ -557,7 +557,11 @@ function drawParcel(
     roundRect(ctx, px + pad, py + pad, s, s, r);
     ctx.stroke();
     ctx.restore();
+    return;
   }
+
+  // La plaza es terreno: su suelo va en esta capa.
+  if (lot.building_type === 'plaza') drawPlazaGround(ctx, px, py, t, lot);
 }
 
 // --- Volumen -----------------------------------------------------------
@@ -1084,29 +1088,164 @@ function drawTank(ctx: CanvasRenderingContext2D, b: Box, t: number, u: number, v
   ctx.restore();
 }
 
-// Plaza: el lote no se edifica. Cantero con camino, un kiosco en el medio y un árbol por nivel.
-function drawPlaza(ctx: CanvasRenderingContext2D, level: number, px: number, py: number, t: number, color: string) {
-  // Bien redondeado: así se lee como un cantero y no como el fondo del tile.
-  ctx.fillStyle = mix('#93b45c', color, 0.2);
-  roundRect(ctx, px + t * 0.14, py + t * 0.22, t * 0.72, t * 0.62, t * 0.3);
+// --- Plaza -------------------------------------------------------------
+// La plaza no se edifica: es una manzana verde con cordón de piedra, senderos en
+// diagonal que llegan a una plazoleta con el kiosco y un cantero con flores del color
+// del dueño. El suelo va con el terreno, así la sombra del vecino le cae encima; lo
+// que se para (árboles, faroles y el kiosco) va con los volúmenes.
+// Medidas en tiles, desde la esquina de arriba a la izquierda del lote.
+const PLAZA = { l: 0.08, r: 0.92, top: 0.13, front: GROUND, curb: 0.035, rise: 0.035, ring: 0.155 };
+const PLAZA_CENTER = { x: (PLAZA.l + PLAZA.r) / 2, y: (PLAZA.top + PLAZA.front) / 2 };
+const STONE = '#ddd2b8';
+const PAVING = '#efe7d3';
+
+// El césped acusa el estado igual que las paredes de los edificios: se apaga y se seca.
+const LAWN: Record<Lot['state'], string> = { activo: '#8fc158', descuidado: '#abb27a', abandonado: '#b4ae8e' };
+
+// Árboles a los costados, de a uno por nivel más uno: (x, pie, tamaño).
+const PLAZA_TREES: [number, number, number][] = [
+  [0.18, 0.7, 0.2],
+  [0.82, 0.69, 0.2],
+  [0.19, 0.4, 0.18],
+  [0.81, 0.41, 0.18],
+];
+// Faroles, uno por nivel: dos a los lados de la plazoleta y el tercero en la entrada,
+// entre los canteros. Es dónde apoya el poste; de noche se prende la cabeza.
+const PLAZA_LAMPS: [number, number][] = [
+  [0.33, 0.68],
+  [0.67, 0.68],
+  [0.5, 0.83],
+];
+const LAMP_H = 0.13;
+
+function drawPlazaGround(ctx: CanvasRenderingContext2D, px: number, py: number, t: number, lot: Lot) {
+  const x = px + t * PLAZA.l;
+  const y = py + t * PLAZA.top;
+  const w = t * (PLAZA.r - PLAZA.l);
+  const h = t * (PLAZA.front - PLAZA.top);
+  const rise = t * PLAZA.rise;
+  const r = t * 0.05;
+
+  ctx.save();
+  // Sombra del cordón, corrida hacia la derecha como la de los edificios.
+  ctx.fillStyle = 'rgba(38, 32, 24, 0.14)';
+  roundRect(ctx, x + rise * 0.8, y + rise * 0.5, w, h + rise, r);
   ctx.fill();
 
-  // Camino que la cruza.
-  ctx.fillStyle = 'rgba(243, 236, 218, 0.8)';
-  roundRect(ctx, px + t * 0.14, py + t * 0.74, t * 0.72, t * 0.09, t * 0.045);
+  // Cordón: el canto al frente y la piedra de arriba.
+  ctx.fillStyle = darken(STONE, 0.2);
+  roundRect(ctx, x, y + rise, w, h, r);
+  ctx.fill();
+  ctx.fillStyle = STONE;
+  roundRect(ctx, x, y, w, h, r);
   ctx.fill();
 
-  const arboles: [number, number, number][] = [
-    [0.25, 0.72, 0.22],
-    [0.77, 0.68, 0.19],
-    [0.63, 0.85, 0.16],
-  ];
-  for (let i = 0; i < Math.min(level, 3); i++) {
-    const [fx, fy, size] = arboles[i];
-    drawTree(ctx, px + t * fx, py + t * fy, t * size);
+  // Césped, adentro del cordón.
+  const c = t * PLAZA.curb;
+  const lx = x + c;
+  const ly = y + c;
+  const lw = w - c * 2;
+  const lh = h - c * 2;
+  roundRect(ctx, lx, ly, lw, lh, r * 0.6);
+  ctx.fillStyle = LAWN[lot.state];
+  ctx.fill();
+  ctx.clip();
+
+  // Franjas de corte, apenas marcadas.
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.07)';
+  const band = lh / 8;
+  for (let i = 0; i < 8; i += 2) ctx.fillRect(lx, ly + band * i, lw, band);
+
+  // Senderos en diagonal, de cada esquina a la plazoleta del medio.
+  const cx = px + t * PLAZA_CENTER.x;
+  const cy = py + t * PLAZA_CENTER.y;
+  ctx.strokeStyle = PAVING;
+  ctx.lineWidth = t * 0.058;
+  ctx.beginPath();
+  for (const [ex, ey] of [
+    [lx, ly],
+    [lx + lw, ly],
+    [lx, ly + lh],
+    [lx + lw, ly + lh],
+  ]) {
+    ctx.moveTo(ex, ey);
+    ctx.lineTo(cx, cy);
+  }
+  ctx.stroke();
+  ctx.fillStyle = PAVING;
+  ctx.beginPath();
+  ctx.arc(cx, cy, t * PLAZA.ring, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(38, 32, 24, 0.1)';
+  ctx.lineWidth = Math.max(0.8, t * 0.01);
+  ctx.stroke();
+
+  // Dos canteros al frente, con flores del color del dueño.
+  const color = lotShade(lot);
+  const bw = t * 0.15;
+  const bh = t * 0.06;
+  const by = py + t * 0.755;
+  const petal = Math.max(1, t * 0.018);
+  for (const bx of [cx - t * 0.035 - bw, cx + t * 0.035]) {
+    ctx.fillStyle = darken(LAWN[lot.state], 0.28);
+    roundRect(ctx, bx, by, bw, bh, bh / 2);
+    ctx.fill();
+    for (let i = 0; i < 4; i++) {
+      ctx.fillStyle = i % 2 ? lighten(color, 0.25) : color;
+      ctx.beginPath();
+      ctx.arc(bx + bh * 0.55 + ((bw - bh * 1.1) * i) / 3, by + bh * (i % 2 ? 0.38 : 0.6), petal, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 
-  drawKiosco(ctx, px + t * 0.48, py + t * 0.74, t * (0.24 + level * 0.025), t, darken(color, 0.22));
+  // El cordón de atrás y el de la izquierda hacen sombra sobre el césped.
+  ctx.fillStyle = 'rgba(38, 32, 24, 0.12)';
+  ctx.fillRect(lx, ly, lw, c * 0.6);
+  ctx.fillRect(lx, ly, c * 0.6, lh);
+  ctx.restore();
+}
+
+// Lo que se para sobre la plaza, de atrás hacia adelante para que se tapen bien.
+function drawPlaza(ctx: CanvasRenderingContext2D, level: number, px: number, py: number, t: number, color: string) {
+  const standing: { y: number; paint: () => void }[] = [];
+  for (const [fx, fy, size] of PLAZA_TREES.slice(0, Math.min(level, 3) + 1)) {
+    standing.push({ y: fy, paint: () => drawTree(ctx, px + t * fx, py + t * fy, t * size) });
+  }
+  for (const [fx, fy] of PLAZA_LAMPS.slice(0, Math.min(level, 3))) {
+    standing.push({ y: fy, paint: () => drawLamp(ctx, px + t * fx, py + t * fy, t) });
+  }
+  // Más chico que la plazoleta, para que se vea el piso alrededor. Crece con el nivel.
+  const w = 0.19 + level * 0.02;
+  const kiosco = PLAZA_CENTER.y + w * 0.3; // el pie del frente: la planta queda centrada en la plazoleta
+  standing.push({
+    y: kiosco,
+    paint: () => drawKiosco(ctx, px + t * PLAZA_CENTER.x, py + t * kiosco, t * w, t, darken(color, 0.22)),
+  });
+  standing.sort((a, b) => a.y - b.y);
+  for (const s of standing) s.paint();
+}
+
+// Farol: un poste fino con la cabeza de vidrio. De noche se enciende en drawNightLights.
+function drawLamp(ctx: CanvasRenderingContext2D, x: number, baseY: number, t: number) {
+  const h = t * LAMP_H;
+  const pw = Math.max(1, t * 0.014);
+  ctx.save();
+  ctx.fillStyle = 'rgba(38, 32, 24, 0.14)';
+  ctx.beginPath();
+  ctx.ellipse(x + t * 0.02, baseY, t * 0.03, t * 0.01, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#4d5357';
+  ctx.fillRect(x - pw / 2, baseY - h, pw, h);
+  ctx.fillRect(x - pw * 1.3, baseY - pw, pw * 2.6, pw);
+  const head = Math.max(1.6, t * 0.026);
+  ctx.beginPath();
+  ctx.arc(x, baseY - h, head, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#f4ecd2';
+  ctx.beginPath();
+  ctx.arc(x, baseY - h, head * 0.6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
 }
 
 // Kiosco de la plaza: tarima, columnas y un techo de cuatro aguas que vuela por
@@ -1176,14 +1315,9 @@ function drawNightLights(
   ctx.shadowBlur = t * 0.16;
 
   if (type === 'plaza') {
-    const faroles: [number, number][] = [
-      [0.19, 0.6],
-      [0.81, 0.58],
-      [0.48, 0.46],
-    ];
-    for (let i = 0; i < Math.min(level, 3); i++) {
+    for (const [fx, fy] of PLAZA_LAMPS.slice(0, Math.min(level, 3))) {
       ctx.beginPath();
-      ctx.arc(px + t * faroles[i][0], py + t * faroles[i][1], Math.max(1.6, t * 0.032), 0, Math.PI * 2);
+      ctx.arc(px + t * fx, py + t * (fy - LAMP_H), Math.max(1.6, t * 0.026), 0, Math.PI * 2);
       ctx.fill();
     }
     ctx.restore();

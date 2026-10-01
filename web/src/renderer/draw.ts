@@ -1458,11 +1458,12 @@ function drawClock(ctx: CanvasRenderingContext2D, px: number, py: number, t: num
   ctx.restore();
 }
 
-// Burbuja de diálogo con lo que pide el dueño: punto del color del material y cuánto le falta.
-// El nombre del material entra solo si el tile es grande; la cola apunta al edificio.
+// Burbuja de diálogo con lo que pide el dueño: punto del color del material y "necesito 14 madera".
+// Con el mapa chico la frase tapa a los vecinos y queda "14 madera"; la cola apunta al edificio.
 function drawRequest(ctx: CanvasRenderingContext2D, px: number, py: number, t: number, request: MapRequest) {
   const fs = Math.max(10, Math.round(t * 0.17));
-  const label = t >= 56 ? `${request.left} ${MATERIAL_LABEL[request.material]}` : String(request.left);
+  const what = `${request.left} ${MATERIAL_LABEL[request.material]}`;
+  const label = t >= 64 ? `necesito ${what}` : what;
   ctx.save();
   ctx.font = `600 ${fs}px system-ui, sans-serif`;
   const dot = fs * 0.32;

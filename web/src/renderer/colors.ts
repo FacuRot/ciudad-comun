@@ -12,6 +12,13 @@ export const LOT_COLORS: Record<string, string> = {
 
 export const ABANDONED = '#9a9a96';
 
+// Punto de color de cada material en la burbuja de pedido.
+export const MATERIAL_COLORS: Record<string, string> = {
+  ladrillo: '#b5532f',
+  madera: '#9a6b3a',
+  energia: '#e0b21a',
+};
+
 export function lotColor(name: string | null): string {
   return (name && LOT_COLORS[name]) || LOT_COLORS.gris;
 }

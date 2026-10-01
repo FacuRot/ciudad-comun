@@ -442,6 +442,10 @@ export type Database = {
           owner_id: string | null
           production_collected_at: string | null
           rent_material: Database["public"]["Enums"]["material_t"] | null
+          request_amount: number | null
+          request_material: Database["public"]["Enums"]["material_t"] | null
+          request_received: number
+          requested_at: string | null
           state: Database["public"]["Enums"]["lot_state_t"]
           status: Database["public"]["Enums"]["lot_status_t"]
           x: number
@@ -461,6 +465,10 @@ export type Database = {
           owner_id?: string | null
           production_collected_at?: string | null
           rent_material?: Database["public"]["Enums"]["material_t"] | null
+          request_amount?: number | null
+          request_material?: Database["public"]["Enums"]["material_t"] | null
+          request_received?: number
+          requested_at?: string | null
           state?: Database["public"]["Enums"]["lot_state_t"]
           status?: Database["public"]["Enums"]["lot_status_t"]
           x: number
@@ -480,6 +488,10 @@ export type Database = {
           owner_id?: string | null
           production_collected_at?: string | null
           rent_material?: Database["public"]["Enums"]["material_t"] | null
+          request_amount?: number | null
+          request_material?: Database["public"]["Enums"]["material_t"] | null
+          request_received?: number
+          requested_at?: string | null
           state?: Database["public"]["Enums"]["lot_state_t"]
           status?: Database["public"]["Enums"]["lot_status_t"]
           x?: number
@@ -729,6 +741,38 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      cancel_request: {
+        Args: never
+        Returns: {
+          barrio_id: string
+          building_type: Database["public"]["Enums"]["building_t"] | null
+          care_count: number
+          care_days: number
+          city_id: string
+          claimed_at: string | null
+          color: string | null
+          id: string
+          level: number
+          name: string | null
+          owner_id: string | null
+          production_collected_at: string | null
+          rent_material: Database["public"]["Enums"]["material_t"] | null
+          request_amount: number | null
+          request_material: Database["public"]["Enums"]["material_t"] | null
+          request_received: number
+          requested_at: string | null
+          state: Database["public"]["Enums"]["lot_state_t"]
+          status: Database["public"]["Enums"]["lot_status_t"]
+          x: number
+          y: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "lots"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       care_lot: {
         Args: { p_lot_id: string }
         Returns: {
@@ -745,6 +789,10 @@ export type Database = {
           owner_id: string | null
           production_collected_at: string | null
           rent_material: Database["public"]["Enums"]["material_t"] | null
+          request_amount: number | null
+          request_material: Database["public"]["Enums"]["material_t"] | null
+          request_received: number
+          requested_at: string | null
           state: Database["public"]["Enums"]["lot_state_t"]
           status: Database["public"]["Enums"]["lot_status_t"]
           x: number
@@ -779,6 +827,10 @@ export type Database = {
           owner_id: string | null
           production_collected_at: string | null
           rent_material: Database["public"]["Enums"]["material_t"] | null
+          request_amount: number | null
+          request_material: Database["public"]["Enums"]["material_t"] | null
+          request_received: number
+          requested_at: string | null
           state: Database["public"]["Enums"]["lot_state_t"]
           status: Database["public"]["Enums"]["lot_status_t"]
           x: number
@@ -947,6 +999,7 @@ export type Database = {
       job_refill_jornadas: { Args: never; Returns: undefined }
       job_update_lot_states: { Args: never; Returns: undefined }
       job_update_population: { Args: never; Returns: undefined }
+      lot_needs: { Args: { p_lot_id: string }; Returns: Json }
       maintain_streets: {
         Args: { p_barrio_id: string }
         Returns: {
@@ -970,6 +1023,41 @@ export type Database = {
       my_city_id: { Args: never; Returns: string }
       recolor_lot: { Args: { p_color: string }; Returns: undefined }
       rename_lot: { Args: { p_name: string }; Returns: undefined }
+      request_materials: {
+        Args: {
+          p_amount: number
+          p_material: Database["public"]["Enums"]["material_t"]
+        }
+        Returns: {
+          barrio_id: string
+          building_type: Database["public"]["Enums"]["building_t"] | null
+          care_count: number
+          care_days: number
+          city_id: string
+          claimed_at: string | null
+          color: string | null
+          id: string
+          level: number
+          name: string | null
+          owner_id: string | null
+          production_collected_at: string | null
+          rent_material: Database["public"]["Enums"]["material_t"] | null
+          request_amount: number | null
+          request_material: Database["public"]["Enums"]["material_t"] | null
+          request_received: number
+          requested_at: string | null
+          state: Database["public"]["Enums"]["lot_state_t"]
+          status: Database["public"]["Enums"]["lot_status_t"]
+          x: number
+          y: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "lots"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       visit_lot: { Args: { p_lot_id: string }; Returns: undefined }
     }
     Enums: {

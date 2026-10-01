@@ -1,6 +1,6 @@
-// Panel "Mi lote" (docs/07-pantallas-y-flujos.md): nombre, color, edificio y construir o mejorar.
+// Panel "Mi lote" (docs/07-pantallas-y-flujos.md): nombre, color, edificio, construir o mejorar y pedir materiales.
 import { useEffect, useState, type FormEvent } from 'react';
-import { build, recolorLot, renameLot } from '../api/actions';
+import { build, cancelRequest, recolorLot, renameLot, requestMaterials } from '../api/actions';
 import { GameError, messageOf } from '../api/errors';
 import { loadHelps, loadVisits } from '../api/reads';
 import { useCity, type CitySnapshot } from '../store/city';
@@ -48,6 +48,7 @@ export function MyLotPanel({ lot }: { lot: Lot }) {
           <p>Tu edificio ya está al máximo.</p>
         </section>
       )}
+      <RequestSection lot={lot} cfg={cfg} inventory={inventory} building={construction !== null} />
       <Visits lotId={lot.id} names={names} />
     </aside>
   );
@@ -345,6 +346,105 @@ function BuildForm(props: {
           </ul>
         </div>
       )}
+    </section>
+  );
+}
+
+// Pedir materiales: queda como burbuja sobre el lote hasta que los regalos lo cubren o se quita.
+// Sin pedido abierto, propone lo que falta para el próximo nivel (si no hay obra en curso).
+function RequestSection(props: { lot: Lot; cfg: CityConfig; inventory: Inventory | null; building: boolean }) {
+  const { lot, cfg, inventory, building } = props;
+  const { min_amount: min, max_amount: max } = cfg.request;
+  const next = !building && lot.level < 3 ? cfg.buildings.levels[String(lot.level + 1)] : null;
+  const short = (m: Material) => (next ? Math.max(0, next.cost[m] - (inventory?.[m] ?? 0)) : 0);
+  const own = lot.level > 0 ? materialOf(lot, cfg) : null;
+  const suggested = cfg.materials.types.find((m) => m !== own && short(m) > 0) ?? null;
+  const [material, setMaterial] = useState<Material>(suggested ?? cfg.materials.types[0]);
+  const [amount, setAmount] = useState(Math.min(max, Math.max(min, suggested ? short(suggested) : min)));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const run = async (action: () => Promise<unknown>) => {
+    setBusy(true);
+    setError(null);
+    try {
+      await action();
+    } catch (err) {
+      setError(messageOf(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (lot.request_material && lot.request_amount !== null) {
+    const left = lot.request_amount - lot.request_received;
+    return (
+      <section>
+        <h3>Tu pedido</h3>
+        <p>
+          {lot.request_amount} de {MATERIAL_LABEL[lot.request_material]}
+          {lot.request_received > 0 && ` · recibiste ${lot.request_received}, faltan ${left}`}
+        </p>
+        <div className="bar">
+          <span style={{ width: `${(lot.request_received / lot.request_amount) * 100}%` }} />
+        </div>
+        <p className="muted">Tus vecinos lo ven en el mapa. Se borra solo cuando te regalan lo que pediste.</p>
+        {error && <p className="error">{error}</p>}
+        <div className="row">
+          <button type="button" className="secondary" disabled={busy} onClick={() => run(cancelRequest)}>
+            Quitar pedido
+          </button>
+        </div>
+      </section>
+    );
+  }
+
+  const valid = amount >= min && amount <= max;
+  return (
+    <section>
+      <h3>Pedir materiales</h3>
+      <div className="types three" role="radiogroup" aria-label="Material a pedir">
+        {cfg.materials.types.map((m) => (
+          <button
+            type="button"
+            key={m}
+            role="radio"
+            aria-checked={m === material}
+            className={m === material ? 'type on' : 'type'}
+            onClick={() => {
+              setMaterial(m);
+              if (short(m) > 0) setAmount(Math.min(max, Math.max(min, short(m))));
+            }}
+          >
+            <span>{MATERIAL_LABEL[m]}</span>
+            {short(m) > 0 && <small>te faltan {short(m)}</small>}
+          </button>
+        ))}
+      </div>
+      <label className="amount">
+        <span>Cantidad</span>
+        <input
+          type="number"
+          inputMode="numeric"
+          min={min}
+          max={max}
+          value={amount}
+          disabled={busy}
+          onChange={(e) => setAmount(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
+        />
+      </label>
+      {!valid && <p className="error">Pedí entre {min} y {max} unidades.</p>}
+      {error && <p className="error">{error}</p>}
+      <div className="row">
+        <button
+          type="button"
+          className="primary"
+          disabled={busy || !valid}
+          onClick={() => run(() => requestMaterials(material, amount))}
+        >
+          Pedir
+        </button>
+      </div>
     </section>
   );
 }

@@ -1,6 +1,6 @@
-// Panel de un lote ajeno (docs/07-pantallas-y-flujos.md): visitar, ayudar, cuidar y regalar.
+// Panel de un lote ajeno (docs/07-pantallas-y-flujos.md): visitar, ver qué le falta, ayudar, cuidar y regalar.
 import { useEffect, useState } from 'react';
-import { careLot, gift, helpConstruction, visitLot } from '../api/actions';
+import { careLot, gift, helpConstruction, lotNeeds, visitLot } from '../api/actions';
 import { GameError, messageOf } from '../api/errors';
 import { loadHelps } from '../api/reads';
 import { useCity } from '../store/city';
@@ -13,7 +13,15 @@ import {
   formatRemaining,
   plural,
 } from '../game/format';
-import { configOf, type CityConfig, type Construction, type Lot, type Material, type PlayerPublic } from '../types/game';
+import {
+  configOf,
+  type CityConfig,
+  type Construction,
+  type Lot,
+  type LotNeeds,
+  type Material,
+  type PlayerPublic,
+} from '../types/game';
 import { PanelBack } from './PanelBack';
 
 const MATERIALS: Material[] = ['ladrillo', 'madera', 'energia'];
@@ -50,9 +58,20 @@ export function OtherLotPanel({ lot, onBack }: { lot: Lot; onBack: () => void })
         <p className={lot.state === 'activo' ? undefined : 'away'}>{stateText(lot, owner)}</p>
       </section>
 
+      {lot.request_material && lot.request_amount !== null && (
+        <section>
+          <h3>Pide materiales</h3>
+          <p>
+            {plural(lot.request_amount - lot.request_received, 'unidad', 'unidades')} de{' '}
+            {MATERIAL_LABEL[lot.request_material]}
+            {lot.request_received > 0 && <span className="muted"> · ya recibió {lot.request_received}</span>}
+          </p>
+        </section>
+      )}
+      {owner && <NeedsSection lot={lot} constructionEndsAt={construction?.ends_at ?? null} />}
       {construction && <HelpSection construction={construction} meId={me.id} jornadas={me.jornadas} cfg={cfg} />}
       {lot.state !== 'activo' && <CareSection lot={lot} jornadas={me.jornadas} cfg={cfg} />}
-      {owner && <GiftSection to={owner} cfg={cfg} />}
+      {owner && <GiftSection key={lot.id} to={owner} lot={lot} cfg={cfg} />}
     </aside>
   );
 }
@@ -63,6 +82,53 @@ function stateText(lot: Lot, owner: PlayerPublic | null): string {
   const days = owner ? daysSince(owner.last_seen_at) : 0;
   if (lot.state === 'abandonado') return `Abandonado hace ${plural(days, 'día', 'días')}`;
   return `Hace ${plural(days, 'día', 'días')} que no viene`;
+}
+
+// Lo que le falta al vecino para su próximo nivel, contando lo que produjo y no recogió.
+// Se relee cuando el lote cambia (sube de nivel, arranca una obra o recibe un regalo de su pedido).
+function NeedsSection({ lot, constructionEndsAt }: { lot: Lot; constructionEndsAt: string | null }) {
+  const [needs, setNeeds] = useState<LotNeeds | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    lotNeeds(lot.id)
+      .then((n) => {
+        if (cancelled) return;
+        setNeeds(n);
+        setError(null);
+      })
+      .catch((err) => !cancelled && setError(messageOf(err)));
+    return () => {
+      cancelled = true;
+    };
+  }, [lot.id, lot.level, lot.request_received, lot.request_material, constructionEndsAt]);
+
+  if (error)
+    return (
+      <section>
+        <p className="error">{error}</p>
+      </section>
+    );
+  if (!needs || needs.target_level === null) return null;
+  const missing = MATERIALS.filter((m) => needs.missing[m] > 0);
+
+  return (
+    <section>
+      <h3>Para el nivel {needs.target_level}</h3>
+      {missing.length === 0 ? (
+        <p className="muted">Tiene todo lo que necesita.</p>
+      ) : (
+        <ul className="cost">
+          {MATERIALS.filter((m) => needs.cost[m] > 0).map((m) => (
+            <li key={m} className={needs.missing[m] > 0 ? 'short' : undefined}>
+              {MATERIAL_LABEL[m]}: {needs.missing[m] > 0 ? `le faltan ${needs.missing[m]}` : 'completo'}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
 }
 
 function HelpSection(props: { construction: Construction; meId: string; jornadas: number; cfg: CityConfig }) {
@@ -150,11 +216,16 @@ function CareSection({ lot, jornadas, cfg }: { lot: Lot; jornadas: number; cfg: 
 }
 
 // Regalar no cuesta jornada: mínimo gift.min_amount, máximo lo que tengo.
-function GiftSection({ to, cfg }: { to: PlayerPublic; cfg: CityConfig }) {
+// Si el vecino tiene un pedido abierto, arranca con su material y lo que le falta.
+function GiftSection({ to, lot, cfg }: { to: PlayerPublic; lot: Lot; cfg: CityConfig }) {
   const inventory = useCity((s) => s.inventory);
   const min = cfg.gift.min_amount;
-  const [material, setMaterial] = useState<Material>('ladrillo');
-  const [amount, setAmount] = useState(min);
+  const asked = lot.request_material && lot.request_amount !== null ? lot.request_amount - lot.request_received : 0;
+  const [material, setMaterial] = useState<Material>(lot.request_material ?? 'ladrillo');
+  // Lo que pide, sin pasarse de lo que tengo: un error de entrada no es buena bienvenida.
+  const [amount, setAmount] = useState(() =>
+    Math.max(min, Math.min(asked, lot.request_material ? (inventory?.[lot.request_material] ?? 0) : 0)),
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState<string | null>(null);

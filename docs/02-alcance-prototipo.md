@@ -24,6 +24,7 @@ Ciudadanos, residencial y mantenimiento de calles se sumaron el 29/09/2026 (regl
 - **Lote con nombre y color** a elección.
 - **Decaimiento simplificado:** activo → descuidado → abandonado, con la acción de cuidar. Sin ruinas ni herencia (en tres semanas casi no ocurrirían).
 - **Regalo de materiales** a cualquier vecino de la ciudad con un botón. **Sin mercado ni precios.**
+- **Pedidos de materiales y lo que le falta a cada lote** (sumado el 01/10/2026, `05` §7.1): cada jugador puede pedir una cantidad de un material, que se ve como una burbuja sobre su edificio hasta que los regalos la cubren; y en el panel de un lote ajeno se ve qué le falta para su próximo nivel. Sin texto libre: no es chat.
 - **Pantalla "mientras no estabas"** al volver.
 - **Registro de visitas** a lotes ajenos ("3 vecinos pasaron por tu lote").
 - **Entrada por link de invitación**: quien la recibe se registra con email y contraseña, y vuelve con esas credenciales por `/entrar`.

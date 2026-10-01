@@ -62,6 +62,7 @@ Barra superior: jornadas (con puntos llenos/vacíos, 6 posiciones) e inventario.
 - El lote construido no se pinta: el edificio se apoya directo sobre el mapa, sin cuadro de color detrás, y el color elegido por el dueño va en las paredes. El lote tomado que todavía no tiene nada construido sí muestra la marca del lote en ese color. El nivel se ve en el alto de las paredes y en cuántas ventanas tiene el frente (una por nivel).
 - Tipo de edificio: cada oficio es un edificio distinto, no un objeto ni un glifo. Ladrillería: fábrica de ladrillo a la vista, losa con parapeto y claraboyas y una chimenea parada sobre el techo que humea mientras el lote está activo. Aserradero: galpón de madera con el techo a dos aguas de punta al frente, óculo en el frontón, portón y troncos apilados al costado. Generador: usina angosta y alta, losa con dos chimeneas cortas y el rayo pintado sobre la losa. Plaza: el lote no se edifica — una manzana verde que ocupa casi todo el lote, con cordón de piedra, césped, senderos en diagonal que llegan a una plazoleta con un kiosco de techo en punta, dos canteros con flores del color del dueño al frente, un árbol más y un farol por nivel. El césped se apaga con `descuidado` y se seca con `abandonado`. Residencial: edificio de departamentos, más alto y angosto que los demás del mismo nivel, con balcones en el frente y un tanque de agua sobre la losa. El glifo (■ ▲ ⚡ ✿ ⌂) queda solo en los paneles. Sin sprites ni imágenes: todo son formas del canvas.
 - Estado: `activo` color pleno; `descuidado` color desaturado al 50 % con un ícono de pasto; `abandonado` gris con ícono de "cuidar" (una mano) visible.
+- Pedido de materiales (`05` §7.1): burbuja de diálogo blanca sobre el lote, con la cola hacia el edificio, un punto del color del material y cuánto falta recibir ("30 ladrillo"; solo el número si el mapa está muy chico). Se ve también de noche. El tooltip suma "· pide 30 de ladrillo".
 - Construcción en curso: borde animado (línea que gira) y un pequeño reloj con el tiempo restante al hacer hover o tocar.
 - Obra pública: celda distinta (más grande visualmente, con borde doble), un edificio cívico con columnas y frontón en el mismo punto de vista, y una barra de progreso dibujada en la parte inferior. Completa, se pone dorada.
 - Lotes libres: borde punteado tenue. Lotes de barrio cerrado: casi invisibles, con el nombre del barrio en gris y "se abre pronto".
@@ -78,6 +79,7 @@ Barra superior: jornadas (con puntos llenos/vacíos, 6 posiciones) e inventario.
 - Si no hay edificio: selector de tipo con la frase "En tu barrio escasea: **energía**" calculada en el cliente (material con menor producción total del barrio). Costo del nivel 1 y botón "Construir (1 jornada, 2 h)". Al elegir Residencial aparece "¿Qué vas a cobrar de alquiler?" con los tres materiales, y el botón no se habilita hasta elegir uno. Debajo: "Aloja 30 ciudadanos. El alquiler rinde según el atractivo del barrio: hoy 78 %, unos 1,6 por hora."
 - Si hay edificio y nivel < 3: costo del siguiente nivel, materiales que faltan en rojo, botón "Mejorar". Si faltan materiales, debajo: "Pediles a tus vecinos" con la lista de quiénes producen ese material en el barrio.
 - Si hay construcción en curso: tiempo restante, quiénes ayudaron.
+- Sección "Pedir materiales": los tres materiales (con "te faltan N" en los que faltan para el próximo nivel), cantidad y botón "Pedir". Arranca con el primer material que falta y no produce el propio lote. Con un pedido abierto, en su lugar: "Tu pedido", lo recibido con una barra y el botón "Quitar pedido".
 - Sección "Quién pasó por acá": visitas de los últimos 7 días.
 
 ### Panel: Lote ajeno
@@ -86,10 +88,12 @@ Al abrirse llama a `visit_lot`.
 
 - Nombre del lote, apodo del dueño, "por acá desde el 14 de sep", tipo y nivel.
 - Estado con explicación humana: "Activo", "Hace 5 días que no viene" (descuidado), "Abandonado hace 9 días".
+- Si tiene un pedido abierto: "Pide materiales" con cuánto falta y cuánto ya recibió.
+- "Para el nivel N": por material, "le faltan N" o "completo" (`lot_needs`). Al máximo, no aparece.
 - Acciones según estado:
   - Construcción en curso → "Ayudar (1 jornada, −1 h)". Deshabilitado si ya ayudó.
   - `descuidado` / `abandonado` → "Cuidar (1 jornada, +2 días)". Muestra cuidados restantes.
-  - Siempre → "Regalar materiales": selector de material, cantidad (mínimo 5, máximo lo que tengo), botón.
+  - Siempre → "Regalar materiales": selector de material, cantidad (mínimo 5, máximo lo que tengo), botón. Si tiene un pedido abierto, arranca con su material y lo que le falta.
 
 ### Panel: Obra pública
 

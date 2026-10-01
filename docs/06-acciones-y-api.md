@@ -35,6 +35,8 @@ Toda acción del jugador es una llamada `supabase.rpc('<función>', {...})`. Las
 | `CARE_LIMIT` | Máximo de cuidados | "Este lote ya recibió todos los cuidados posibles." |
 | `GIFT_TOO_SMALL` | Menos del mínimo | "El regalo mínimo es de 5 unidades." |
 | `RENT_MATERIAL` | Residencial sin material de alquiler, o material en otro tipo o distinto del que ya tiene | "Elegí qué material vas a cobrar de alquiler." |
+| `REQUEST_AMOUNT` | Pedido fuera de `request.min_amount`..`request.max_amount` | "Pedí entre 5 y 100 unidades." |
+| `NO_REQUEST` | Quitar un pedido que no existe | "No tenés ningún pedido abierto." |
 | `STREETS_FULL` | Mantener calles que ya están en 100 (o de un barrio cerrado) | "Las calles ya están al día." |
 | `STREETS_DONE_TODAY` | Ya mantuvo las calles de ese barrio hoy | "Hoy ya mantuviste estas calles. Mañana podés de nuevo." |
 | `NOT_ADMIN` | Sin permisos | — |
@@ -96,6 +98,17 @@ Solo sobre lotes ajenos en estado `descuidado` o `abandonado` y con menos de `ca
 
 ### `gift(p_to_player, p_material, p_amount)` → void
 Sin jornada. Mueve materiales entre inventarios en la misma transacción. Emite `gift.sent`, encola aviso al receptor.
+
+### `request_materials(p_material, p_amount)` → lots
+Sin jornada. Abre el pedido del lote propio (`05` §7.1), o lo reemplaza. `REQUEST_AMOUNT` si la cantidad está fuera de rango. Emite `request.created`.
+
+### `cancel_request()` → lots
+Quita el pedido propio. `NO_REQUEST` si no hay. Emite `request.cancelled`.
+
+### `lot_needs(p_lot_id)` → jsonb
+Solo lectura, sin evento. `{target_level, cost, missing}` del próximo nivel de un lote ocupado de la ciudad (el siguiente al de la obra en curso, si hay); `missing` cuenta el inventario del dueño más su producción sin recoger, sin recogerla. Con el lote al máximo, los tres en null. `NO_LOT` si el lote no está ocupado o es de otra ciudad.
+
+`gift` además descuenta del pedido del receptor si es de ese material, y al cubrirlo lo borra y emite `request.fulfilled`.
 
 ### `visit_lot(p_lot_id)` → void
 Se llama al abrir el panel de un lote ajeno. Inserta en `lot_visits` con `on conflict do nothing`; solo emite `lot.visited` si fue la primera visita del día.

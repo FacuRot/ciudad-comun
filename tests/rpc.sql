@@ -165,6 +165,61 @@ select pg_temp.ok((select madera = 10 from inventories where player_id = '111111
                   'un regalo fallido no crea materiales');
 
 -- ---------------------------------------------------------------------
+-- lot_needs
+-- ---------------------------------------------------------------------
+-- B (10/15/10, sin edificio) para el nivel 1 (15/10/0): le faltan 5 de ladrillo.
+select pg_temp.ok(lot_needs(pg_temp.lot(1,0)) = '{"target_level": 1, "cost": {"ladrillo": 15, "madera": 10, "energia": 0},
+                                                  "missing": {"ladrillo": 5, "madera": 0, "energia": 0}}'::jsonb,
+                  'lot_needs: lo que le falta a B para el nivel 1');
+-- A (15/10/10) está construyendo el nivel 1: cuenta el 2 (30/25/15).
+select pg_temp.ok(lot_needs(pg_temp.lot(0,0)) -> 'missing' = '{"ladrillo": 15, "madera": 15, "energia": 5}'::jsonb
+                  and (lot_needs(pg_temp.lot(0,0)) ->> 'target_level')::int = 2,
+                  'lot_needs: con obra en curso mira el nivel siguiente');
+select pg_temp.err($$select lot_needs(pg_temp.lot(2,0))$$, 'NO_LOT');  -- lote libre
+select pg_temp.err($$select lot_needs(gen_random_uuid())$$, 'NO_LOT');
+
+-- ---------------------------------------------------------------------
+-- request_materials / cancel_request
+-- ---------------------------------------------------------------------
+select pg_temp.err($$select request_materials('madera', 4)$$, 'REQUEST_AMOUNT');
+select pg_temp.err($$select request_materials('madera', 101)$$, 'REQUEST_AMOUNT');
+select pg_temp.err($$select cancel_request()$$, 'NO_REQUEST');
+select pg_temp.ok((request_materials('madera', 20)).request_amount = 20, 'request_materials: B pide 20 de madera');
+select pg_temp.ok((select (request_material, request_amount, request_received) = ('madera'::material_t, 20, 0)
+                     from lots where owner_id = '22222222-2222-2222-2222-222222222222'), 'el pedido queda en el lote');
+select pg_temp.ok(exists (select 1 from events where type = 'request.created' and payload @> '{"material": "madera", "amount": 20}'),
+                  'evento request.created');
+
+-- Un regalo de otro material no cuenta; los de madera suman hasta cubrirlo.
+select pg_temp.as_user('33333333-3333-3333-3333-333333333333');
+select gift('22222222-2222-2222-2222-222222222222', 'ladrillo', 5);
+select gift('22222222-2222-2222-2222-222222222222', 'madera', 10);
+select pg_temp.ok((select (request_material, request_received) = ('madera'::material_t, 10)
+                     from lots where owner_id = '22222222-2222-2222-2222-222222222222'), 'el regalo de madera descuenta del pedido');
+select gift('22222222-2222-2222-2222-222222222222', 'madera', 10);
+select pg_temp.ok((select request_material is null and request_amount is null and request_received = 0
+                     from lots where owner_id = '22222222-2222-2222-2222-222222222222'), 'cubierto, el pedido se borra');
+select pg_temp.ok(exists (select 1 from events where type = 'request.fulfilled' and payload @> '{"material": "madera", "received": 20}'),
+                  'evento request.fulfilled');
+
+-- Un pedido nuevo reemplaza al anterior, y el dueño lo puede quitar.
+select pg_temp.as_user('22222222-2222-2222-2222-222222222222');
+select request_materials('energia', 10);
+select pg_temp.ok((request_materials('ladrillo', 30)).request_material = 'ladrillo', 'un pedido nuevo reemplaza al anterior');
+select pg_temp.ok((cancel_request()).request_material is null, 'cancel_request quita el pedido');
+select pg_temp.ok(exists (select 1 from events where type = 'request.cancelled' and payload @> '{"material": "ladrillo"}'),
+                  'evento request.cancelled');
+
+select pg_temp.as_user('44444444-4444-4444-4444-444444444444');
+select pg_temp.err($$select request_materials('madera', 10)$$, 'NO_PLAYER');
+select pg_temp.err($$select lot_needs(pg_temp.lot(0,0))$$, 'NO_PLAYER');
+
+-- Vuelven los inventarios a como estaban para lo que sigue.
+update inventories set ladrillo = 10, madera = 15 where player_id = '22222222-2222-2222-2222-222222222222';
+update inventories set ladrillo = 20, madera = 20 where player_id = '33333333-3333-3333-3333-333333333333';
+select pg_temp.as_user('22222222-2222-2222-2222-222222222222');
+
+-- ---------------------------------------------------------------------
 -- NO_JORNADAS
 -- ---------------------------------------------------------------------
 select pg_temp.as_user('33333333-3333-3333-3333-333333333333');

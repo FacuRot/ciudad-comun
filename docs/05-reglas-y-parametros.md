@@ -157,6 +157,15 @@ El estado depende de los **días desde la última entrada del dueño** (`players
 - Mínimo por regalo: 5 unidades (para que no sea spam de 1 unidad).
 - Registra evento `gift.sent` con emisor, receptor, material y cantidad. El receptor lo ve en su resumen.
 
+### 7.1 Pedidos y lo que le falta a cada lote
+
+Ampliación aprobada el 01/10/2026.
+
+- **Pedir:** cada jugador puede tener un pedido abierto: un material y una cantidad entre `request.min_amount` (5) y `request.max_amount` (100). No cuesta jornada. Un pedido nuevo reemplaza al anterior.
+- Se ve en el mapa como una burbuja de diálogo sobre el edificio, con el color del material y cuánto falta recibir.
+- **Se cubre con regalos:** cada regalo de ese material al dueño suma a lo recibido; cuando llega a la cantidad pedida, el pedido se borra solo. Los regalos de otro material no cuentan. El dueño también lo puede quitar.
+- **Lo que le falta a un vecino:** el panel de un lote ajeno muestra, por material, cuánto le falta para el próximo nivel (el siguiente al que se está construyendo, si hay obra). Cuenta su inventario más la producción que todavía no recogió. Nunca se ve el inventario de otro, solo el faltante.
+
 ## 8. Lotes, barrios y apertura
 
 | Parámetro | Valor | Clave |
@@ -240,6 +249,7 @@ Todos son idempotentes: correrlos dos veces no produce efectos dobles. `update_p
   "care": { "days_added": 2, "max_per_absence": 3, "min_state": "descuidado" },
   "decay": { "descuidado_after_days": 4, "abandonado_after_days": 8 },
   "gift": { "min_amount": 5 },
+  "request": { "min_amount": 5, "max_amount": 100 },
   "lots": { "max_claim_distance": 2 },
   "barrio": { "open_threshold": 0.85, "open_after_days": 10, "open_population": 300 },
   "summary": { "min_hours_away": 2 },

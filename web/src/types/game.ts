@@ -43,6 +43,14 @@ export type JoinMap = {
   works: MapWork[];
 };
 
+// Lo que le falta a un lote para su próximo nivel (lot_needs). target_level null: ya no sube más.
+export type LotNeeds =
+  | { target_level: number; cost: Record<Material, number>; missing: Record<Material, number> }
+  | { target_level: null; cost: null; missing: null };
+
+// Pedido de materiales de un lote, para dibujar la burbuja: cuánto le falta recibir.
+export type MapRequest = { material: Material; left: number };
+
 export type StreetsRanges = { worn_below: number; broken_below: number };
 
 // Forma de cities.config (docs/05-reglas-y-parametros.md §14). Solo lo que usa el cliente.
@@ -65,6 +73,7 @@ export type CityConfig = {
   care: { days_added: number; max_per_absence: number; min_state: LotState };
   decay: { descuidado_after_days: number; abandonado_after_days: number };
   gift: { min_amount: number };
+  request: { min_amount: number; max_amount: number };
   lots: { max_claim_distance: number };
   barrio: { open_threshold: number; open_after_days: number; open_population: number };
   palette: string[];

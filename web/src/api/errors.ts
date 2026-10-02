@@ -28,6 +28,8 @@ const MESSAGES: Record<string, string> = {
   RENT_MATERIAL: 'Elegí qué material vas a cobrar de alquiler.',
   STREETS_FULL: 'Las calles ya están al día.',
   STREETS_DONE_TODAY: 'Hoy ya mantuviste estas calles. Mañana podés de nuevo.',
+  REQUEST_AMOUNT: 'Pedí entre 5 y 100 unidades.',
+  NO_REQUEST: 'No tenés ningún pedido abierto.',
   BAD_AMOUNT: 'Las cantidades no pueden ser negativas.',
   NOT_ADMIN: 'Esto es solo para el equipo.',
   // De la entrada con contraseña (ver authCodeOf).

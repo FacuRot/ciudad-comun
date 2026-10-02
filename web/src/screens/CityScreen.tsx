@@ -17,7 +17,7 @@ import { InviteModal } from '../panels/InviteModal';
 import { Toasts } from '../panels/Toasts';
 import { gridSize, workPercent, type Cell } from '../game/geo';
 import { MATERIAL_LABEL } from '../game/format';
-import { configOf, type GameEvent, type Inventory, type Material } from '../types/game';
+import { configOf, type GameEvent, type Inventory, type MapRequest, type Material } from '../types/game';
 import { Notice } from '../App';
 
 // Qué muestra el panel lateral. 'mine' es el estado de reposo.
@@ -80,13 +80,23 @@ function CityScreen() {
     const myLot = lots.find((l) => l.owner_id === me.id) ?? null;
     const names = new Map(players.map((p) => [p.id, p.display_name]));
 
+    // Pedidos abiertos: cuánto le falta recibir a cada lote, para la burbuja y el tooltip.
+    const requests = new Map<string, MapRequest>();
+    for (const l of lots) {
+      if (l.request_material && l.request_amount !== null) {
+        requests.set(l.id, { material: l.request_material, left: l.request_amount - l.request_received });
+      }
+    }
+
     const tooltip = (cell: Cell) => {
       const work = works.find((w) => w.x === cell.x && w.y === cell.y);
       if (work) return `${work.name} · ${workPercent(work)} %`;
       const lot = lots.find((l) => l.x === cell.x && l.y === cell.y);
       if (!lot || lot.status === 'cerrado') return null;
       if (lot.status === 'libre') return 'Lote libre';
-      return `${lot.name} · ${names.get(lot.owner_id ?? '') ?? ''}`;
+      const base = `${lot.name} · ${names.get(lot.owner_id ?? '') ?? ''}`;
+      const request = requests.get(lot.id);
+      return request ? `${base} · pide ${request.left} de ${MATERIAL_LABEL[request.material]}` : base;
     };
 
     // Un toque abre el panel de lo que haya en la celda; en una calle o un lote libre vuelve a mi lote.
@@ -120,6 +130,7 @@ function CityScreen() {
       works,
       barrios: barrios.map((b) => ({ ...b, streets: streetsLevel(streetsState(b, cfg), cfg.streets) })),
       constructions,
+      requests,
       timezone: city.timezone,
       myLotId: myLot?.id,
       selectedLotId: selection.kind === 'lot' ? selection.id : null,

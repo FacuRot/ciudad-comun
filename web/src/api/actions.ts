@@ -10,6 +10,7 @@ import type {
   GameEvent,
   JoinMap,
   Lot,
+  LotNeeds,
   LotState,
   Material,
   PublicWork,
@@ -144,6 +145,29 @@ export async function gift(toPlayer: string, material: Material, amount: number)
   const { error } = await sb.rpc('gift', { p_to_player: toPlayer, p_material: material, p_amount: amount });
   if (error) throw new GameError(codeOf(error));
   await refreshMe().catch(() => {});
+}
+
+// Pedir materiales: queda como burbuja sobre el lote hasta que lo cubren los regalos o se quita.
+// Reemplaza el pedido anterior. Cantidad entre request.min_amount y request.max_amount.
+export async function requestMaterials(material: Material, amount: number): Promise<Lot> {
+  const { data, error } = await sb.rpc('request_materials', { p_material: material, p_amount: amount });
+  if (error) throw new GameError(codeOf(error));
+  useCity.getState().applyLot(data as Lot);
+  return data as Lot;
+}
+
+export async function cancelRequest(): Promise<Lot> {
+  const { data, error } = await sb.rpc('cancel_request');
+  if (error) throw new GameError(codeOf(error));
+  useCity.getState().applyLot(data as Lot);
+  return data as Lot;
+}
+
+// Lo que le falta a un lote de la ciudad para su próximo nivel. No muestra el inventario del dueño.
+export async function lotNeeds(lotId: string): Promise<LotNeeds> {
+  const { data, error } = await sb.rpc('lot_needs', { p_lot_id: lotId });
+  if (error) throw new GameError(codeOf(error));
+  return data as unknown as LotNeeds;
 }
 
 // Se llama al abrir el panel de un lote ajeno. No pasa nada si falla: es solo registro.

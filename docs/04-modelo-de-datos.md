@@ -47,6 +47,7 @@ Un lote por celda construible. Campos clave:
 - `state`: `activo`, `descuidado`, `abandonado`. Lo recalcula el cron diario y `heartbeat()` al entrar el dueño.
 - `production_collected_at`: desde cuándo hay producción sin recoger. Se usa para el cálculo perezoso.
 - `care_days`, `care_count`: días de gracia acumulados y cantidad de cuidados en la ausencia actual. Se reinician cuando el dueño vuelve.
+- `request_material`, `request_amount`, `request_received`, `requested_at`: el pedido de materiales abierto (`05` §7.1), uno por lote. NULL sin pedido (`request_received` en 0). Lo escriben `request_materials` y `cancel_request`; `gift` suma a `request_received` y lo borra al cubrirse.
 
 Invariante: un jugador tiene como máximo un lote (`UNIQUE (owner_id)`).
 
@@ -89,6 +90,9 @@ La tabla más importante para el experimento. Una fila por acción relevante:
 | `public_work.completed` | — | — | — | `{public_work_id, name}` |
 | `lot.cared` | cuidador | lote | dueño | `{care_count}` |
 | `gift.sent` | emisor | — | receptor | `{material, amount}` |
+| `request.created` | dueño | lote | — | `{material, amount}` |
+| `request.cancelled` | dueño | lote | — | `{material, amount, received}` |
+| `request.fulfilled` | quien hizo el último regalo | lote | — | `{material, amount, received}` · sin `target_player_id` para no entrar al resumen; el dueño ya recibe el `gift.sent` |
 | `lot.visited` | visitante | lote | dueño | `{}` |
 | `lot.state_changed` | — | lote | dueño | `{from, to}` |
 | `barrio.opened` | — | — | — | `{barrio_id, name, reason}` · `reason`: `population`, `threshold`, `time` o `admin` |
@@ -106,7 +110,7 @@ Lo que el sistema *querría* notificar (construcción terminada, vecino nuevo, r
 ## Funciones RPC (contrato en `06-acciones-y-api.md`)
 
 Públicas (llamadas desde el cliente, `SECURITY DEFINER`, validan `auth.uid()`):
-`claim_lot`, `rename_lot`, `recolor_lot`, `build`, `help_construction`, `contribute`, `care_lot`, `maintain_streets`, `gift`, `visit_lot`, `heartbeat`, `get_summary`, `create_invitation`.
+`claim_lot`, `rename_lot`, `recolor_lot`, `build`, `help_construction`, `contribute`, `care_lot`, `maintain_streets`, `gift`, `request_materials`, `cancel_request`, `lot_needs`, `visit_lot`, `heartbeat`, `get_summary`, `create_invitation`.
 
 Públicas para `anon` (pantalla de entrada, antes de tener jugador): `invitation_info`, `invitation_map`.
 
@@ -119,7 +123,7 @@ Internas (no expuestas, usadas por las anteriores y por cron):
 ## Seguridad (RLS)
 
 - `SELECT` permitido para autenticados en todas las tablas del juego, filtrado por `city_id` del jugador (en el prototipo hay una sola ciudad, pero el filtro queda desde el inicio).
-- `inventories` y `players.email`: solo el propio jugador ve su inventario y su email; el resto ve `display_name`, `jornadas` no.
+- `inventories` y `players.email`: solo el propio jugador ve su inventario y su email; el resto ve `display_name`, `jornadas` no. Lo que le falta a un vecino para su próximo nivel se lee con `lot_needs`, que devuelve el faltante y nunca el inventario.
 - Ningún `INSERT`/`UPDATE`/`DELETE` para el rol `authenticated`. Todo pasa por funciones.
 - `notifications_outbox` y `invitations` no son legibles por jugadores comunes (solo por `service_role` y admins).
 

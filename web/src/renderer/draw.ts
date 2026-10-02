@@ -4,11 +4,11 @@
 // se ve el frente y el techo entero, nunca los costados. La luz viene de la
 // izquierda, así que el techo es lo más claro y cada edificio tira sombra sobre el
 // piso hacia la derecha. El lote no se pinta: el edificio se apoya directo sobre el mapa.
-import type { BuildingType, MapBarrio as Barrio, MapLot as Lot, MapWork as PublicWork } from '../types/game';
+import type { BuildingType, MapBarrio as Barrio, MapLot as Lot, MapRequest, MapWork as PublicWork } from '../types/game';
 import { workPercent, type Cell } from '../game/geo';
-import { formatRemaining } from '../game/format';
+import { MATERIAL_LABEL, formatRemaining } from '../game/format';
 import type { Layout } from './layout';
-import { ABANDONED, darken, desaturate, lighten, lotColor, mix } from './colors';
+import { ABANDONED, MATERIAL_COLORS, darken, desaturate, lighten, lotColor, mix } from './colors';
 import { CURB, streetBarrios, streetsOf, ZEBRA } from './streets';
 import type { StreetsLevel } from '../types/game';
 import { phaseAt, type Phase } from './time';
@@ -23,6 +23,7 @@ export type Scene = {
   works: PublicWork[];
   barrios: Barrio[];
   constructions?: { lot_id: string; ends_at: string }[]; // solo las en curso
+  requests?: Map<string, MapRequest>; // pedidos de materiales abiertos, por lote
   timezone: string;
   myLotId?: string | null;
   selectedLotId?: string | null;
@@ -226,6 +227,14 @@ export function drawScene(ctx: CanvasRenderingContext2D, layout: Layout, scene: 
     if (!building.has(lot.id)) continue;
     const { px, py } = at(lot);
     drawWorking(ctx, px, py, t, now);
+  }
+
+  // Pedidos de materiales: una burbuja sobre el lote, también de noche.
+  for (const lot of scene.lots) {
+    const request = scene.requests?.get(lot.id);
+    if (!request || lot.status !== 'ocupado') continue;
+    const { px, py } = at(lot);
+    drawRequest(ctx, px, py, t, request);
   }
 
   // Textos por encima del filtro de noche.
@@ -1446,6 +1455,48 @@ function drawClock(ctx: CanvasRenderingContext2D, px: number, py: number, t: num
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
   ctx.fillText(text, cx + r + fs * 0.4, cy + 1);
+  ctx.restore();
+}
+
+// Burbuja de diálogo con lo que pide el dueño: punto del color del material y "necesito 14 madera".
+// Con el mapa chico la frase tapa a los vecinos y queda "14 madera"; la cola apunta al edificio.
+function drawRequest(ctx: CanvasRenderingContext2D, px: number, py: number, t: number, request: MapRequest) {
+  const fs = Math.max(10, Math.round(t * 0.17));
+  const what = `${request.left} ${MATERIAL_LABEL[request.material]}`;
+  const label = t >= 64 ? `necesito ${what}` : what;
+  ctx.save();
+  ctx.font = `600 ${fs}px system-ui, sans-serif`;
+  const dot = fs * 0.32;
+  const h = fs * 1.6;
+  const w = fs * 0.55 + dot * 2 + fs * 0.35 + ctx.measureText(label).width + fs * 0.55;
+  const tail = fs * 0.45;
+  const cx = px + t / 2;
+  const x = Math.max(4, Math.min(cx - w / 2, ctx.canvas.clientWidth - w - 4));
+  const y = Math.max(4, py - h * 0.55);
+
+  softShadow(ctx, fs * 0.5, fs * 0.12, 0.28);
+  ctx.fillStyle = '#fffdf6';
+  roundRect(ctx, x, y, w, h, h / 2);
+  ctx.fill();
+  // Cola: un triángulo que baja hacia el lote, recortado al ancho de la burbuja.
+  const tx = Math.max(x + h / 2, Math.min(cx, x + w - h / 2));
+  ctx.beginPath();
+  ctx.moveTo(tx - tail * 0.7, y + h - 1);
+  ctx.lineTo(tx + tail * 0.7, y + h - 1);
+  ctx.lineTo(tx - tail * 0.1, y + h + tail);
+  ctx.closePath();
+  ctx.fill();
+  clearShadow(ctx);
+
+  ctx.fillStyle = MATERIAL_COLORS[request.material] ?? '#888';
+  ctx.beginPath();
+  ctx.arc(x + fs * 0.55 + dot, y + h / 2, dot, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = '#2f2e2a';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(label, x + fs * 0.55 + dot * 2 + fs * 0.35, y + h / 2 + 1);
   ctx.restore();
 }
 

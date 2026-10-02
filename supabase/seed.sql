@@ -34,7 +34,8 @@ begin
     "residential": { "capacity_by_level": { "1": 30, "2": 60, "3": 100 } },
     "streets": { "initial": 100, "decay_per_day": 10, "points": 4,
                  "cost": { "ladrillo": 10 }, "max_per_player_per_day": 1,
-                 "worn_below": 70, "broken_below": 40 }
+                 "worn_below": 70, "broken_below": 40 },
+    "request": { "min_amount": 5, "max_amount": 100 }
   }$j$::jsonb;
 
   insert into cities(name, config) values ('Ciudad Común · Cohorte 1', cfg) returning id into cid;

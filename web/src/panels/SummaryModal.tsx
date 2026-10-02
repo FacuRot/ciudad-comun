@@ -4,7 +4,8 @@
 import { useState, type ReactNode } from 'react';
 import { useCity } from '../store/city';
 import { workAmounts, workPercent } from '../game/geo';
-import { BUILDING_LABEL, MATERIAL_LABEL, formatPercent, plural, reasonText } from '../game/format';
+import { BUILDING_LABEL, MATERIAL_LABEL, formatPercent, formatPoints, reasonText } from '../game/format';
+import { t } from '../i18n';
 import type { FactorKey } from '../game/citizens';
 import { shownStreets, streetsLevel, streetsState } from '../game/streets';
 import {
@@ -48,8 +49,8 @@ export function SummaryModal({
 
   return (
     <div className="modal-back">
-      <div className="modal" role="dialog" aria-modal="true" aria-label="Mientras no estabas">
-        <h2>Mientras no estabas</h2>
+      <div className="modal" role="dialog" aria-modal="true" aria-label={t.summary.title}>
+        <h2>{t.summary.title}</h2>
         <ul className="summary">
           {shown.map((line) => (
             <li key={line.key}>{line.node}</li>
@@ -57,12 +58,12 @@ export function SummaryModal({
         </ul>
         {hidden > 0 && (
           <button type="button" className="link more" onClick={() => setExpanded(true)}>
-            y {plural(hidden, 'cosa más', 'cosas más')}
+            {t.summary.more(hidden)}
           </button>
         )}
         <div className="row">
           <button type="button" className="primary" onClick={onClose}>
-            Ver la ciudad
+            {t.summary.seeCity}
           </button>
         </div>
       </div>
@@ -83,7 +84,7 @@ function buildLines(
   cfg: CityConfig,
 ): Line[] {
   const names = new Map(players.map((p) => [p.id, p.display_name]));
-  const nameOf = (id: string | null) => names.get(id ?? '') ?? 'Alguien';
+  const nameOf = (id: string | null) => names.get(id ?? '') ?? t.common.someone;
   const of = (type: string) => events.filter((e) => e.type === type);
   const payload = (e: GameEvent) => (e.payload ?? {}) as Record<string, unknown>;
   const lines: Line[] = [];
@@ -93,11 +94,7 @@ function buildLines(
     const p = payload(e);
     lines.push({
       key: `c${e.id}`,
-      node: (
-        <>
-          Tu <strong>{BUILDING_LABEL[p.building_type as BuildingType].toLowerCase()}</strong> subió a nivel {String(p.level)}.
-        </>
-      ),
+      node: t.summary.completed(BUILDING_LABEL[p.building_type as BuildingType].toLowerCase(), String(p.level)),
     });
   }
 
@@ -106,11 +103,7 @@ function buildLines(
   if (helpers.length > 0) {
     lines.push({
       key: 'helps',
-      node: (
-        <>
-          {strongList(helpers)} {helpers.length === 1 ? 'ayudó' : 'ayudaron'} en tu construcción.
-        </>
-      ),
+      node: t.summary.helped(strongList(helpers), helpers.length),
     });
   }
 
@@ -119,11 +112,7 @@ function buildLines(
     const p = payload(e);
     lines.push({
       key: `g${e.id}`,
-      node: (
-        <>
-          <strong>{nameOf(e.actor_id)}</strong> te regaló {String(p.amount)} de {MATERIAL_LABEL[p.material as Material]}.
-        </>
-      ),
+      node: t.summary.gift(nameOf(e.actor_id), String(p.amount), MATERIAL_LABEL[p.material as Material]),
     });
   }
 
@@ -132,11 +121,7 @@ function buildLines(
   if (carers.length > 0) {
     lines.push({
       key: 'cares',
-      node: (
-        <>
-          {strongList(carers)} {carers.length === 1 ? 'cuidó' : 'cuidaron'} tu lote.
-        </>
-      ),
+      node: t.summary.cared(strongList(carers), carers.length),
     });
   }
 
@@ -146,11 +131,7 @@ function buildLines(
     const work = works.find((w) => w.id === id);
     lines.push({
       key: `wc${id}`,
-      node: (
-        <>
-          Se terminó la obra <strong>{work?.name ?? 'del barrio'}</strong>.
-        </>
-      ),
+      node: t.summary.workDone(work?.name),
     });
   }
   for (const [id, before] of progressBefore(of('public_work.contributed'), works)) {
@@ -162,11 +143,7 @@ function buildLines(
     if (to === from) continue;
     lines.push({
       key: `wp${id}`,
-      node: (
-        <>
-          La obra <strong>{work.name}</strong> avanzó del {from} % al {to} %.
-        </>
-      ),
+      node: t.summary.workProgress(work.name, formatPoints(from), formatPoints(to)),
     });
   }
 
@@ -174,11 +151,7 @@ function buildLines(
   for (const e of of('barrio.opened')) {
     lines.push({
       key: `b${e.id}`,
-      node: (
-        <>
-          Se abrió el <strong>{String(payload(e).name)}</strong>.
-        </>
-      ),
+      node: t.summary.barrioOpened(String(payload(e).name)),
     });
   }
 
@@ -201,25 +174,8 @@ function buildLines(
       key: 'citizens',
       node: (
         <>
-          Ciudadanos del <strong>{barrio?.name ?? 'barrio'}</strong>:{' '}
-          {arrived > 0 && (
-            <>
-              {arrived === 1 ? 'llegó' : 'llegaron'} <strong>{arrived}</strong>
-            </>
-          )}
-          {arrived > 0 && left > 0 && ', '}
-          {left > 0 && (
-            <>
-              {left === 1 ? 'se fue' : 'se fueron'} <strong>{left}</strong>
-            </>
-          )}
-          .
-          {reason && (
-            <>
-              {' '}
-              Lo que más resta: <strong>{reasonText(reason, work?.name)}</strong>.
-            </>
-          )}
+          {t.summary.citizens(barrio?.name, arrived, left)}
+          {reason && <> {t.mainReason(reasonText(reason, work?.name))}</>}
         </>
       ),
     });
@@ -231,16 +187,11 @@ function buildLines(
     const level = streetsLevel(state, cfg.streets);
     const cost = cfg.materials.types
       .filter((m) => (cfg.streets.cost[m] ?? 0) > 0)
-      .map((m) => `${cfg.streets.cost[m]} de ${MATERIAL_LABEL[m]}`);
+      .map((m) => t.amountOf(cfg.streets.cost[m] ?? 0, MATERIAL_LABEL[m]));
     if (level !== 'buenas') {
       lines.push({
         key: 'streets',
-        node: (
-          <>
-            Las calles del barrio están <strong>{level}</strong> ({shownStreets(state)} de 100). Mantenerlas cuesta 1 jornada
-            {cost.length > 0 && ` y ${cost.join(' y ')}`}.
-          </>
-        ),
+        node: t.summary.streets(t.streetsLevel[level], shownStreets(state), cost),
       });
     }
   }
@@ -251,14 +202,9 @@ function buildLines(
   if (rent && collected.material && collected.amount) {
     lines.push({
       key: 'rent',
-      node: (
-        <>
-          Tu <strong>residencial</strong> rindió al <strong>{formatPercent(Math.round(collected.attractiveness! * 100) / 100)}</strong>: cobraste{' '}
-          <strong>
-            {collected.amount} de {MATERIAL_LABEL[collected.material]}
-          </strong>
-          .
-        </>
+      node: t.summary.rent(
+        formatPercent(Math.round(collected.attractiveness! * 100) / 100),
+        t.amountOf(collected.amount, MATERIAL_LABEL[collected.material]),
       ),
     });
   }
@@ -268,11 +214,7 @@ function buildLines(
   if (newcomers.length > 0) {
     lines.push({
       key: 'joined',
-      node: (
-        <>
-          {strongList(newcomers)} {newcomers.length === 1 ? 'fundó su lote' : 'fundaron sus lotes'} cerca del tuyo.
-        </>
-      ),
+      node: t.summary.joined(strongList(newcomers), newcomers.length),
     });
   }
 
@@ -281,11 +223,7 @@ function buildLines(
   if (visitors.length > 0) {
     lines.push({
       key: 'visits',
-      node: (
-        <>
-          <strong>{plural(visitors.length, 'vecino pasó', 'vecinos pasaron')}</strong> por tu lote.
-        </>
-      ),
+      node: t.summary.visits(visitors.length),
     });
   }
 
@@ -293,11 +231,7 @@ function buildLines(
   if (!rent && collected.material && collected.amount) {
     lines.push({
       key: 'collected',
-      node: (
-        <>
-          Recogiste <strong>{collected.amount} de {MATERIAL_LABEL[collected.material]}</strong>.
-        </>
-      ),
+      node: t.summary.collected(t.amountOf(collected.amount, MATERIAL_LABEL[collected.material])),
     });
   }
 
@@ -329,11 +263,11 @@ function unique(values: string[]): string[] {
   return [...new Set(values.filter(Boolean))];
 }
 
-// "Marta", "Marta y Juan", "Marta, Juan y Ana".
+// "Marta", "Marta y Juan", "Marta, Juan y Ana" (o "and" en inglés).
 function strongList(names: string[]): ReactNode {
   return names.map((name, i) => (
     <span key={name}>
-      {i > 0 && (i === names.length - 1 ? ' y ' : ', ')}
+      {i > 0 && (i === names.length - 1 ? t.common.and : ', ')}
       <strong>{name}</strong>
     </span>
   ));

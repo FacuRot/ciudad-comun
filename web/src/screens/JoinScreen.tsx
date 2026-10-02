@@ -14,6 +14,8 @@ import { claimableLotIds, gridSize, suggestedLotIds, workPercent, type Cell } fr
 import { streetsLevel } from '../game/streets';
 import type { JoinMap, MapLot } from '../types/game';
 import { Notice } from '../App';
+import { t } from '../i18n';
+import { colorLabel, formatPoints } from '../game/format';
 
 export function JoinScreen({ token }: { token: string }) {
   const session = useCity((s) => s.session);
@@ -71,11 +73,11 @@ export function JoinScreen({ token }: { token: string }) {
 
   const tooltip = (c: Cell) => {
     const work = map?.works.find((w) => w.x === c.x && w.y === c.y);
-    if (work) return `${work.name} · ${workPercent(work)} %`;
+    if (work) return `${work.name} · ${formatPoints(workPercent(work))}`;
     const lot = lotAt(c);
     if (!lot || lot.status === 'cerrado') return null;
     if (lot.status === 'ocupado') return lot.name;
-    return view?.marks.get(lot.id) === 'blocked' ? 'Lejos de los vecinos' : 'Lote libre';
+    return view?.marks.get(lot.id) === 'blocked' ? t.join.far : t.join.freeLot;
   };
 
   const pick = (c: Cell) => {
@@ -90,7 +92,7 @@ export function JoinScreen({ token }: { token: string }) {
     setSelectedId(lot.id);
   };
 
-  if (info === undefined || (session && !meReady) || me) return <Notice>Cargando…</Notice>;
+  if (info === undefined || (session && !meReady) || me) return <Notice>{t.common.loading}</Notice>;
   if (!info || !info.valid) return <Notice>{new GameError('BAD_INVITE').message}</Notice>;
 
   const selected = map?.lots.find((l) => l.id === selectedId) ?? null;
@@ -104,9 +106,7 @@ export function JoinScreen({ token }: { token: string }) {
       {choosing && !selected && (
         <div className="card">
           <p>
-            {hint ??
-              'Tocá un lote con borde punteado para fundar el tuyo.' +
-                (info.lot_hint ? ' Los que laten están al lado de quien te invitó.' : '')}
+            {hint ?? t.join.pickHint + (info.lot_hint ? t.join.suggestedHint : '')}
           </p>
         </div>
       )}
@@ -159,16 +159,8 @@ function CuentaCard({ inviter }: { inviter: string | null }) {
 
   return (
     <form className="card" onSubmit={submit}>
-      <h1>
-        {inviter ? (
-          <>
-            <strong>{inviter}</strong> te invitó a Ciudad Común
-          </>
-        ) : (
-          'Te invitaron a Ciudad Común'
-        )}
-      </h1>
-      <label htmlFor="email">Tu email</label>
+      <h1>{inviter ? t.join.invitedBy(inviter) : t.join.invited}</h1>
+      <label htmlFor="email">{t.common.yourEmail}</label>
       <input
         id="email"
         type="email"
@@ -177,7 +169,7 @@ function CuentaCard({ inviter }: { inviter: string | null }) {
         value={email}
         onChange={(e) => setEmail(e.target.value)}
       />
-      <label htmlFor="clave">{nueva ? `Elegí una contraseña (mínimo ${MIN_CLAVE} caracteres)` : 'Tu contraseña'}</label>
+      <label htmlFor="clave">{nueva ? t.join.choosePassword(MIN_CLAVE) : t.common.yourPassword}</label>
       <input
         id="clave"
         type="password"
@@ -190,12 +182,12 @@ function CuentaCard({ inviter }: { inviter: string | null }) {
       {error && <p className="error">{error}</p>}
       <div className="row">
         <button className="primary" disabled={busy || (nueva && password.length < MIN_CLAVE)}>
-          {nueva ? 'Crear cuenta y elegir lote' : 'Entrar'}
+          {nueva ? t.join.createAndPick : t.common.logIn}
         </button>
       </div>
       <p>
         <button type="button" className="link" onClick={cambiarModo}>
-          {nueva ? 'Ya tengo cuenta' : 'Quiero crear una cuenta'}
+          {nueva ? t.join.haveAccount : t.join.wantAccount}
         </button>
       </p>
     </form>
@@ -253,8 +245,8 @@ function FoundCard(props: {
 
   return (
     <form className="card" onSubmit={submit}>
-      <h1>Tu lote</h1>
-      <label htmlFor="apodo">Tu apodo (lo ven todos)</label>
+      <h1>{t.join.yourLot}</h1>
+      <label htmlFor="apodo">{t.join.nickname}</label>
       <input
         id="apodo"
         maxLength={24}
@@ -262,18 +254,18 @@ function FoundCard(props: {
         value={displayName}
         onChange={(e) => setDisplayName(e.target.value)}
       />
-      <label htmlFor="lote">Nombre del lote</label>
+      <label htmlFor="lote">{t.join.lotName}</label>
       <input id="lote" maxLength={24} value={lotName} onChange={(e) => setLotName(e.target.value)} />
-      <label>Color</label>
-      <div className="swatches" role="radiogroup" aria-label="Color">
+      <label>{t.common.color}</label>
+      <div className="swatches" role="radiogroup" aria-label={t.common.color}>
         {palette.map((c) => (
           <button
             type="button"
             key={c}
             role="radio"
             aria-checked={c === color}
-            aria-label={c}
-            title={c}
+            aria-label={colorLabel(c)}
+            title={colorLabel(c)}
             className={c === color ? 'swatch on' : 'swatch'}
             style={{ background: LOT_COLORS[c] }}
             onClick={() => setColor(c)}
@@ -283,10 +275,10 @@ function FoundCard(props: {
       {error && <p className="error">{error}</p>}
       <div className="row">
         <button type="button" className="secondary" onClick={onCancel} disabled={busy}>
-          Otro lote
+          {t.join.otherLot}
         </button>
         <button className="primary" disabled={busy || !validName(displayName) || !validName(lotName)}>
-          Fundar acá
+          {t.join.foundHere}
         </button>
       </div>
     </form>

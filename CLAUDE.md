@@ -42,9 +42,10 @@ Proyecto en la nube: `ciudad-comun` (ref `ublcrfhnysqpegzmywwi`, sa-east-1). Sin
 
 ## Convenciones
 
-- Español en UI, comentarios, docs, nombres de eventos y mensajes de error al usuario. Identificadores de código en inglés (`lot`, `player`, `construction`) salvo los términos del juego que no traducimos: `jornada`, `barrio`, `ladrillo`, `madera`, `energia`.
+- Español en comentarios, docs y nombres de eventos. Identificadores de código en inglés (`lot`, `player`, `construction`) salvo los términos del juego que no traducimos: `jornada`, `barrio`, `ladrillo`, `madera`, `energia`.
+- La UI está en inglés y español, según el idioma del navegador (inglés por defecto). Ningún texto visible se escribe en un componente: va en `web/src/i18n/en.tsx` (define las claves) y en `es.tsx`, y se lee con `t` de `web/src/i18n`. Para probar el otro idioma, cambiá el idioma preferido del navegador.
 - Cada función SQL nueva: migración → `supabase gen types` → wrapper tipado en `web/src/api/actions.ts` → uso en el panel. En ese orden.
-- Errores: las funciones lanzan `raise exception 'CODIGO'`. El cliente traduce en `web/src/api/errors.ts`. Nunca mostrar texto crudo de Postgres.
+- Errores: las funciones lanzan `raise exception 'CODIGO'`. El cliente traduce en `web/src/api/errors.ts`, con los textos de `errors` en `web/src/i18n/`. Nunca mostrar texto crudo de Postgres.
 - Cada acción emite un evento en `events` con el `type` de la tabla de `docs/04-modelo-de-datos.md`. Si agregás un tipo nuevo, agregalo a esa tabla.
 - Los jobs de cron son idempotentes. Probalos corriéndolos dos veces seguidas.
 - Sin tests de UI. Sí tests SQL de cada RPC (caso feliz + cada código de error) en `tests/rpc.sql`.

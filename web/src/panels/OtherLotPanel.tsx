@@ -11,10 +11,10 @@ import {
   daysSince,
   formatDay,
   formatRemaining,
-  plural,
 } from '../game/format';
 import { configOf, type CityConfig, type Construction, type Lot, type Material, type PlayerPublic } from '../types/game';
 import { PanelBack } from './PanelBack';
+import { t } from '../i18n';
 
 const MATERIALS: Material[] = ['ladrillo', 'madera', 'energia'];
 
@@ -36,16 +36,16 @@ export function OtherLotPanel({ lot, onBack }: { lot: Lot; onBack: () => void })
         <PanelBack onBack={onBack} />
         <h2>{lot.name}</h2>
         <p className="muted">
-          {owner?.display_name ?? 'Alguien'}
-          {owner && ` · por acá desde el ${formatDay(owner.created_at)}`}
+          {owner?.display_name ?? t.common.someone}
+          {owner && t.otherLot.aroundSince(formatDay(owner.created_at))}
         </p>
         {lot.level > 0 && lot.building_type ? (
           <p>
-            <span className="glyph">{BUILDING_GLYPH[lot.building_type]}</span> {BUILDING_LABEL[lot.building_type]} ·
-            nivel {lot.level}
+            <span className="glyph">{BUILDING_GLYPH[lot.building_type]}</span> {BUILDING_LABEL[lot.building_type]} ·{' '}
+            {t.common.level(lot.level)}
           </p>
         ) : (
-          <p className="muted">Todavía no construyó nada.</p>
+          <p className="muted">{t.otherLot.nothingBuilt}</p>
         )}
         <p className={lot.state === 'activo' ? undefined : 'away'}>{stateText(lot, owner)}</p>
       </section>
@@ -59,10 +59,10 @@ export function OtherLotPanel({ lot, onBack }: { lot: Lot; onBack: () => void })
 
 // "Activo", "Hace 5 días que no viene", "Abandonado hace 9 días" (docs/07, panel Lote ajeno).
 function stateText(lot: Lot, owner: PlayerPublic | null): string {
-  if (lot.state === 'activo') return 'Activo';
+  if (lot.state === 'activo') return t.otherLot.active;
   const days = owner ? daysSince(owner.last_seen_at) : 0;
-  if (lot.state === 'abandonado') return `Abandonado hace ${plural(days, 'día', 'días')}`;
-  return `Hace ${plural(days, 'día', 'días')} que no viene`;
+  if (lot.state === 'abandonado') return t.otherLot.abandoned(days);
+  return t.otherLot.away(days);
 }
 
 function HelpSection(props: { construction: Construction; meId: string; jornadas: number; cfg: CityConfig }) {
@@ -97,17 +97,13 @@ function HelpSection(props: { construction: Construction; meId: string; jornadas
 
   return (
     <section>
-      <h3>
-        En obra: {BUILDING_LABEL[construction.building_type]} nivel {construction.target_level}
-      </h3>
-      <p className="rate">
-        {left > 0 ? `Faltan ${formatRemaining(left)}` : 'Terminando: en unos minutos sube de nivel.'}
-      </p>
-      {helped && <p className="muted">Ya ayudaste en esta obra.</p>}
+      <h3>{t.common.underConstruction(BUILDING_LABEL[construction.building_type], construction.target_level)}</h3>
+      <p className="rate">{left > 0 ? t.common.left(formatRemaining(left)) : t.common.finishing}</p>
+      {helped && <p className="muted">{t.errors.ALREADY_HELPED}</p>}
       {error && <p className="error">{error}</p>}
       <div className="row">
         <button type="button" className="primary" disabled={busy || helped !== false || jornadas < 1} onClick={submit}>
-          Ayudar (1 jornada, −{cfg.help.hours_reduced} h)
+          {t.otherLot.help(cfg.help.hours_reduced)}
         </button>
       </div>
     </section>
@@ -133,16 +129,14 @@ function CareSection({ lot, jornadas, cfg }: { lot: Lot; jornadas: number; cfg: 
 
   return (
     <section>
-      <h3>Cuidar el lote</h3>
+      <h3>{t.otherLot.careTitle}</h3>
       <p className="muted">
-        {left > 0
-          ? `Le quedan ${plural(left, 'cuidado', 'cuidados')} hasta que vuelva su dueño.`
-          : 'Ya recibió todos los cuidados posibles hasta que vuelva.'}
+        {left > 0 ? t.otherLot.careLeft(left) : t.otherLot.careFull}
       </p>
       {error && <p className="error">{error}</p>}
       <div className="row">
         <button type="button" className="primary" disabled={busy || left === 0 || jornadas < 1} onClick={submit}>
-          Cuidar (1 jornada, +{cfg.care.days_added} días)
+          {t.otherLot.care(cfg.care.days_added)}
         </button>
       </div>
     </section>
@@ -166,7 +160,7 @@ function GiftSection({ to, cfg }: { to: PlayerPublic; cfg: CityConfig }) {
     setSent(null);
     try {
       await gift(to.id, material, amount);
-      setSent(`Le regalaste ${amount} de ${MATERIAL_LABEL[material]} a ${to.display_name}.`);
+      setSent(t.otherLot.sent(amount, MATERIAL_LABEL[material], to.display_name));
       setAmount(min);
     } catch (err) {
       setError(messageOf(err));
@@ -177,8 +171,8 @@ function GiftSection({ to, cfg }: { to: PlayerPublic; cfg: CityConfig }) {
 
   return (
     <section>
-      <h3>Regalar materiales</h3>
-      <div className="types three" role="radiogroup" aria-label="Material a regalar">
+      <h3>{t.otherLot.giftTitle}</h3>
+      <div className="types three" role="radiogroup" aria-label={t.otherLot.giftMaterial}>
         {MATERIALS.map((m) => (
           <button
             type="button"
@@ -189,12 +183,12 @@ function GiftSection({ to, cfg }: { to: PlayerPublic; cfg: CityConfig }) {
             onClick={() => setMaterial(m)}
           >
             <span>{MATERIAL_LABEL[m]}</span>
-            <small>tengo {inventory?.[m] ?? 0}</small>
+            <small>{t.otherLot.have(inventory?.[m] ?? 0)}</small>
           </button>
         ))}
       </div>
       <label className="amount">
-        <span>Cantidad</span>
+        <span>{t.otherLot.amount}</span>
         <input
           type="number"
           inputMode="numeric"
@@ -211,7 +205,7 @@ function GiftSection({ to, cfg }: { to: PlayerPublic; cfg: CityConfig }) {
       {sent && <p className="muted">{sent}</p>}
       <div className="row">
         <button type="button" className="primary" disabled={busy || amount < min || amount > have} onClick={submit}>
-          Regalar
+          {t.otherLot.give}
         </button>
       </div>
     </section>

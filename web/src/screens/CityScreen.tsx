@@ -16,9 +16,10 @@ import { streetsLevel, streetsState } from '../game/streets';
 import { InviteModal } from '../panels/InviteModal';
 import { Toasts } from '../panels/Toasts';
 import { gridSize, workPercent, type Cell } from '../game/geo';
-import { MATERIAL_LABEL } from '../game/format';
+import { MATERIAL_LABEL, formatPoints } from '../game/format';
 import { configOf, type GameEvent, type Inventory, type Material } from '../types/game';
 import { Notice } from '../App';
+import { t } from '../i18n';
 
 // Qué muestra el panel lateral. 'mine' es el estado de reposo.
 type Selection =
@@ -35,8 +36,8 @@ export function CityGate() {
   useEffect(() => {
     if (!session) navigate('/entrar', true);
   }, [session]);
-  if (!session || !meReady) return <Notice>Cargando…</Notice>;
-  if (!me) return <Notice>Todavía no tenés lote. Abrí el link de tu invitación para fundar el tuyo.</Notice>;
+  if (!session || !meReady) return <Notice>{t.common.loading}</Notice>;
+  if (!me) return <Notice>{t.city.noLot}</Notice>;
   return <CityScreen />;
 }
 
@@ -82,10 +83,10 @@ function CityScreen() {
 
     const tooltip = (cell: Cell) => {
       const work = works.find((w) => w.x === cell.x && w.y === cell.y);
-      if (work) return `${work.name} · ${workPercent(work)} %`;
+      if (work) return `${work.name} · ${formatPoints(workPercent(work))}`;
       const lot = lots.find((l) => l.x === cell.x && l.y === cell.y);
       if (!lot || lot.status === 'cerrado') return null;
-      if (lot.status === 'libre') return 'Lote libre';
+      if (lot.status === 'libre') return t.join.freeLot;
       return `${lot.name} · ${names.get(lot.owner_id ?? '') ?? ''}`;
     };
 
@@ -106,7 +107,7 @@ function CityScreen() {
     const footer = [
       barrio.name,
       `${barrioLots.filter((l) => l.status === 'ocupado').length}/${barrioLots.length}`,
-      work ? `${work.name} ${workPercent(work)} %` : null,
+      work ? `${work.name} ${formatPoints(workPercent(work))}` : null,
     ]
       .filter(Boolean)
       .join(' · ');
@@ -130,7 +131,7 @@ function CityScreen() {
   }, [snapshot, me.id, selection]);
 
   if (error) return <Notice>{error}</Notice>;
-  if (!view) return <Notice>Cargando la ciudad…</Notice>;
+  if (!view) return <Notice>{t.city.loading}</Notice>;
 
   return (
     <div className="city">
@@ -138,14 +139,14 @@ function CityScreen() {
         <Jornadas value={me.jornadas} cap={view.cap} />
         {inventory && <Materials inventory={inventory} />}
         <button type="button" className="secondary invite" onClick={() => setInviting(true)}>
-          Invitar
+          {t.city.invite}
         </button>
       </header>
       <main className="map">
         <CityCanvas scene={view.scene} tooltip={view.tooltip} onCellClick={view.click} />
       </main>
       <button type="button" className="mapfoot" onClick={() => setSelection({ kind: 'barrio', id: view.barrio.id })}>
-        {view.footer} <span className="muted">· qué falta</span>
+        {view.footer} <span className="muted">{t.city.whatsMissing}</span>
       </button>
       <Panel selection={selection} onBack={backToMine} onSelect={setSelection} myLotId={view.myLot?.id ?? null} />
       <Toasts />
@@ -188,13 +189,11 @@ function Panel(props: {
 
 function Jornadas({ value, cap }: { value: number; cap: number }) {
   return (
-    <span className="jornadas" title={`${value} de ${cap} jornadas`}>
+    <span className="jornadas" title={t.city.jornadasTitle(value, cap)}>
       {Array.from({ length: cap }, (_, i) => (
         <span key={i} className={i < value ? 'dot on' : 'dot'} />
       ))}
-      <span>
-        {value} {value === 1 ? 'jornada' : 'jornadas'}
-      </span>
+      <span>{t.common.jornadas(value)}</span>
     </span>
   );
 }

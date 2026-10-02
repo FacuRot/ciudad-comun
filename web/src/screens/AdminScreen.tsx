@@ -16,10 +16,11 @@ import { loadBarrios } from '../api/reads';
 import { useCity } from '../store/city';
 import { navigate } from '../router';
 import { noticeFor } from '../game/events';
-import { formatWhen, plural } from '../game/format';
+import { formatPoints, formatWhen } from '../game/format';
 import { workAmounts, workPercent } from '../game/geo';
 import type { Barrio } from '../types/game';
 import { Notice } from '../App';
+import { t } from '../i18n';
 
 // /admin solo para quien tiene sesión, lote y is_admin.
 export function AdminGate() {
@@ -29,7 +30,7 @@ export function AdminGate() {
   useEffect(() => {
     if (!session) navigate('/entrar', true);
   }, [session]);
-  if (!session || !meReady) return <Notice>Cargando…</Notice>;
+  if (!session || !meReady) return <Notice>{t.common.loading}</Notice>;
   if (!me?.is_admin) return <Notice>{new GameError('NOT_ADMIN').message}</Notice>;
   return <AdminScreen />;
 }
@@ -69,18 +70,18 @@ function AdminScreen() {
   }, [load]);
 
   if (error && !data) return <Notice>{error}</Notice>;
-  if (!data) return <Notice>Cargando el panel…</Notice>;
+  if (!data) return <Notice>{t.admin.loading}</Notice>;
 
   return (
     <div className="admin">
       <header>
-        <h1>Administración</h1>
+        <h1>{t.admin.title}</h1>
         <div className="row">
           <button type="button" className="secondary" onClick={load} disabled={busy}>
-            Actualizar
+            {t.admin.refresh}
           </button>
           <button type="button" className="secondary" onClick={() => navigate('/city')}>
-            Ir a la ciudad
+            {t.admin.goToCity}
           </button>
         </div>
       </header>
@@ -100,37 +101,32 @@ function Stats({ stats }: { stats: CityStats }) {
 
   return (
     <section>
-      <h2>La ciudad</h2>
+      <h2>{t.admin.cityTitle}</h2>
       <ul className="facts">
+        <li>{t.admin.players(stats.players, stats.active_today)}</li>
         <li>
-          <strong>{stats.players}</strong> jugadores · <strong>{stats.active_today}</strong> entraron hoy
+          {t.admin.lotsFree(stats.lots_free)} ·{' '}
+          {states.length ? states.map(([s, n]) => `${n} ${t.lotState[s] ?? s}`).join(' · ') : t.admin.noOccupied}
         </li>
-        <li>
-          <strong>{stats.lots_free}</strong> lotes libres ·{' '}
-          {states.length ? states.map(([s, n]) => `${n} ${s}`).join(' · ') : 'sin lotes ocupados'}
-        </li>
-        <li>
-          <strong>{stats.constructions_active}</strong> construcciones en curso
-        </li>
-        <li>
-          <strong>{stats.pending_notifications}</strong> avisos sin enviar
-        </li>
+        <li>{t.admin.constructions(stats.constructions_active)}</li>
+        <li>{t.admin.unsent(stats.pending_notifications)}</li>
       </ul>
 
-      <h3>Obras</h3>
+      <h3>{t.admin.works}</h3>
       <ul className="facts">
         {(stats.works ?? []).map((w) => (
           <li key={w.name}>
-            {w.name}: {workPercent({ cost: w.cost, progress: w.progress })} % · {w.status}{' '}
+            {w.name}: {formatPoints(workPercent({ cost: w.cost, progress: w.progress }))} ·{' '}
+            {t.workStatus[w.status] ?? w.status}{' '}
             <span className="muted">
-              (jornadas {workAmounts(w.progress).jornadas}/{workAmounts(w.cost).jornadas})
+              {t.admin.workJornadas(workAmounts(w.progress).jornadas, workAmounts(w.cost).jornadas)}
             </span>
           </li>
         ))}
       </ul>
 
-      <h3>Nuevos en 24 h</h3>
-      <p>{nuevos.length ? nuevos.join(', ') : <span className="muted">Nadie nuevo. Mandá invitaciones.</span>}</p>
+      <h3>{t.admin.newIn24h}</h3>
+      <p>{nuevos.length ? nuevos.join(', ') : <span className="muted">{t.admin.nobodyNew}</span>}</p>
     </section>
   );
 }
@@ -140,7 +136,7 @@ function Barrios({ barrios, onDone }: { barrios: Barrio[]; onDone: () => void })
   const [error, setError] = useState<string | null>(null);
 
   const open = async (barrio: Barrio) => {
-    if (!window.confirm(`¿Abrir el ${barrio.name}? No se puede deshacer y le avisa a toda la ciudad.`)) return;
+    if (!window.confirm(t.admin.confirmOpen(barrio.name))) return;
     setBusy(barrio.id);
     setError(null);
     try {
@@ -155,16 +151,16 @@ function Barrios({ barrios, onDone }: { barrios: Barrio[]; onDone: () => void })
 
   return (
     <section>
-      <h2>Barrios</h2>
+      <h2>{t.admin.barrios}</h2>
       {error && <p className="error">{error}</p>}
       <ul className="facts">
         {barrios.map((b) => (
           <li key={b.id}>
-            {b.name} · {b.status}
-            {b.opened_at && <span className="muted"> desde el {formatWhen(b.opened_at)}</span>}
+            {b.name} · {t.barrioStatus[b.status] ?? b.status}
+            {b.opened_at && <span className="muted">{t.admin.since(formatWhen(b.opened_at))}</span>}
             {b.status === 'cerrado' && (
               <button type="button" className="secondary inline" disabled={busy === b.id} onClick={() => open(b)}>
-                Abrir
+                {t.admin.open}
               </button>
             )}
           </li>
@@ -194,17 +190,17 @@ function Pending({ rows, onDone }: { rows: PendingNotification[]; onDone: () => 
 
   return (
     <section>
-      <h2>Avisos pendientes</h2>
+      <h2>{t.admin.pending}</h2>
       {error && <p className="error">{error}</p>}
       {rows.length === 0 ? (
-        <p className="muted">No hay nada sin enviar.</p>
+        <p className="muted">{t.admin.nothingPending}</p>
       ) : (
         <table>
           <thead>
             <tr>
-              <th>Para</th>
-              <th>Aviso</th>
-              <th>Cuándo</th>
+              <th>{t.admin.to}</th>
+              <th>{t.admin.notice}</th>
+              <th>{t.admin.when}</th>
               <th />
             </tr>
           </thead>
@@ -216,7 +212,7 @@ function Pending({ rows, onDone }: { rows: PendingNotification[]; onDone: () => 
                 <td className="muted">{formatWhen(n.created_at)}</td>
                 <td>
                   <button type="button" className="secondary inline" disabled={busy === n.id} onClick={() => mark(n.id)}>
-                    Marcar enviado
+                    {t.admin.markSent}
                   </button>
                 </td>
               </tr>
@@ -233,20 +229,20 @@ function Invitations({ rows }: { rows: AdminInvitation[] }) {
 
   return (
     <section>
-      <h2>Invitaciones sin usar</h2>
+      <h2>{t.admin.invitations}</h2>
       <p className="muted">
-        {plural(usable.length, 'link vigente', 'links vigentes')}
-        {rows.length > usable.length && ` · ${rows.length - usable.length} vencidos`}
+        {t.admin.validLinks(usable.length)}
+        {rows.length > usable.length && t.admin.expiredLinks(rows.length - usable.length)}
       </p>
       {rows.length === 0 ? (
-        <p className="muted">No quedan invitaciones. Se crean desde el botón "Invitar" de la ciudad.</p>
+        <p className="muted">{t.admin.noInvitations}</p>
       ) : (
         <table>
           <thead>
             <tr>
-              <th>Link</th>
-              <th>De</th>
-              <th>Vence</th>
+              <th>{t.admin.link}</th>
+              <th>{t.admin.from}</th>
+              <th>{t.admin.expires}</th>
             </tr>
           </thead>
           <tbody>
@@ -261,10 +257,10 @@ function Invitations({ rows }: { rows: AdminInvitation[] }) {
                   />
                 </td>
                 <td>
-                  {i.inviter ?? 'el equipo'}
+                  {i.inviter ?? t.admin.team}
                   {i.lot_hint_name && <span className="muted"> · {i.lot_hint_name}</span>}
                 </td>
-                <td className="muted">{i.expired ? 'vencida' : formatWhen(i.expires_at)}</td>
+                <td className="muted">{i.expired ? t.admin.expired : formatWhen(i.expires_at)}</td>
               </tr>
             ))}
           </tbody>

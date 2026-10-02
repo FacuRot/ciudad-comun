@@ -9,10 +9,11 @@ import { workPercent } from '../game/geo';
 import { effectiveRate, scarceMaterial } from '../game/production';
 import { barrioAttractiveness, barrioCapacity, populationTarget, populationTrend } from '../game/citizens';
 import { gameDay, shownStreets, streetsLevel, streetsState } from '../game/streets';
-import { BUILDING_COUNT, BUILDING_GLYPH, MATERIAL_LABEL, formatNumber, plural } from '../game/format';
+import { BUILDING_COUNT, BUILDING_GLYPH, MATERIAL_LABEL, formatNumber, formatPoints } from '../game/format';
 import { configOf, type Barrio, type CityConfig, type Lot, type Material, type PublicWork } from '../types/game';
 import { AttractivenessFactors } from './AttractivenessFactors';
 import { PanelBack } from './PanelBack';
+import { t } from '../i18n';
 
 export function BarrioPanel({
   barrio,
@@ -40,9 +41,9 @@ export function BarrioPanel({
     if (rate.material) production.set(rate.material, production.get(rate.material)! + rate.total);
   }
 
-  const byType = cfg.buildings.types.map((t) => ({
-    type: t,
-    count: taken.filter((l) => l.building_type === t && l.level > 0).length,
+  const byType = cfg.buildings.types.map((type) => ({
+    type,
+    count: taken.filter((l) => l.building_type === type && l.level > 0).length,
   }));
   const empty = taken.filter((l) => l.level === 0).length;
   const scarce = scarceMaterial(barrio.id, lots, works, barrios, constructions, cfg);
@@ -53,8 +54,8 @@ export function BarrioPanel({
         <PanelBack onBack={onBack} />
         <h2>{barrio.name}</h2>
         <p className="muted">
-          {taken.length} de {mine.length} lotes ocupados
-          {free.length > 0 && ` · ${plural(free.length, 'lote libre', 'lotes libres')}`}
+          {t.barrio.occupied(taken.length, mine.length)}
+          {free.length > 0 && t.barrio.free(free.length)}
         </p>
       </section>
 
@@ -62,26 +63,26 @@ export function BarrioPanel({
       {barrio.status === 'abierto' && <Streets barrio={barrio} cfg={cfg} timezone={snapshot.city.timezone} />}
 
       <section>
-        <h3>Qué se produce por hora</h3>
+        <h3>{t.barrio.productionTitle}</h3>
         <ul className="cost">
           {cfg.materials.types.map((m) => (
             <li key={m} className={m === scarce ? 'short' : undefined}>
-              {formatNumber(production.get(m)!)} de {MATERIAL_LABEL[m]}
-              {m === scarce && ' · es lo que más escasea'}
+              {t.amountOf(formatNumber(production.get(m)!), MATERIAL_LABEL[m])}
+              {m === scarce && t.barrio.scarcest}
             </li>
           ))}
         </ul>
       </section>
 
       <section>
-        <h3>Qué hay construido</h3>
+        <h3>{t.barrio.builtTitle}</h3>
         <ul className="cost">
           {byType.map(({ type, count }) => (
             <li key={type}>
-              <span className="glyph">{BUILDING_GLYPH[type]}</span> {plural(count, ...BUILDING_COUNT[type])}
+              <span className="glyph">{BUILDING_GLYPH[type]}</span> {t.barrio.buildingCount(count, ...BUILDING_COUNT[type])}
             </li>
           ))}
-          {empty > 0 && <li className="muted">{plural(empty, 'lote sin edificio', 'lotes sin edificio')}</li>}
+          {empty > 0 && <li className="muted">{t.barrio.emptyLots(empty)}</li>}
         </ul>
       </section>
 
@@ -92,11 +93,11 @@ export function BarrioPanel({
             <span style={{ width: `${workPercent(work)}%` }} />
           </div>
           <p className="muted">
-            {work.status === 'completada' ? 'Obra terminada: el barrio produce más.' : `${workPercent(work)} % construida`}
+            {work.status === 'completada' ? t.barrio.workDone : t.barrio.workBuilt(formatPoints(workPercent(work)))}
           </p>
           <div className="row">
             <button type="button" className="secondary" onClick={() => onOpenWork(work.id)}>
-              Ver la obra
+              {t.barrio.seeWork}
             </button>
           </div>
         </section>
@@ -106,9 +107,9 @@ export function BarrioPanel({
 }
 
 const TREND = {
-  1: { arrow: '↑', text: 'mañana llegan más' },
+  1: { arrow: '↑', text: t.barrio.trendUp },
   0: { arrow: '', text: '' },
-  [-1]: { arrow: '↓', text: 'mañana se va gente' },
+  [-1]: { arrow: '↓', text: t.barrio.trendDown },
 } as const;
 
 // Población, objetivo de hoy, capacidad y los cuatro factores del atractivo (docs/07, panel Barrio).
@@ -116,8 +117,8 @@ function Citizens({ barrio, lots, works, cfg }: { barrio: Barrio; lots: Lot[]; w
   if (barrio.status !== 'abierto') {
     return (
       <section>
-        <h3>Ciudadanos</h3>
-        <p className="muted">Se abre pronto.</p>
+        <h3>{t.barrio.citizens}</h3>
+        <p className="muted">{t.barrio.opensSoon}</p>
       </section>
     );
   }
@@ -132,17 +133,17 @@ function Citizens({ barrio, lots, works, cfg }: { barrio: Barrio; lots: Lot[]; w
   const work = works.find((w) => w.barrio_id === barrio.id);
   // "24 lotes con edificio y 2 residenciales": los residenciales van aparte porque alojan más.
   const housing = [
-    others > 0 && plural(others, 'lote con edificio', 'lotes con edificio'),
-    residential > 0 && plural(residential, 'residencial', 'residenciales'),
+    others > 0 && t.barrio.lotsWithBuilding(others),
+    residential > 0 && t.barrio.residentials(residential),
   ]
     .filter(Boolean)
-    .join(' y ');
+    .join(t.common.and);
 
   return (
     <section>
-      <h3>Ciudadanos</h3>
+      <h3>{t.barrio.citizens}</h3>
       <p className="citizens">
-        <strong>{formatNumber(barrio.population)}</strong> de {formatNumber(target)} ciudadanos
+        {t.barrio.citizensLine(formatNumber(barrio.population), formatNumber(target))}
         {trend.arrow && (
           <span className="trend" title={trend.text} aria-label={trend.text}>
             {' '}
@@ -152,8 +153,8 @@ function Citizens({ barrio, lots, works, cfg }: { barrio: Barrio; lots: Lot[]; w
       </p>
       <p className="muted">
         {capacity > 0
-          ? `Hay lugar para ${formatNumber(capacity)}: ${housing}.`
-          : `Todavía no vive nadie: cada lote con edificio da lugar a ${cfg.citizens.capacity_per_lot}.`}
+          ? t.barrio.roomFor(formatNumber(capacity), housing)
+          : t.barrio.nobodyLives(cfg.citizens.capacity_per_lot)}
       </p>
       <AttractivenessFactors attractiveness={attractiveness} workName={work?.name} />
     </section>
@@ -188,7 +189,7 @@ function Streets({ barrio, cfg, timezone }: { barrio: Barrio; cfg: CityConfig; t
   const shown = shownStreets(state);
   const s = cfg.streets;
   const cost = cfg.materials.types.filter((m) => (s.cost[m] ?? 0) > 0);
-  const costText = ['1 jornada', ...cost.map((m) => `${s.cost[m]} ${MATERIAL_LABEL[m]}`)].join(', ');
+  const costText = [t.barrio.oneJornada, ...cost.map((m) => `${s.cost[m]} ${MATERIAL_LABEL[m]}`)].join(', ');
 
   const today = gameDay(now, timezone);
   const doneToday =
@@ -197,20 +198,20 @@ function Streets({ barrio, cfg, timezone }: { barrio: Barrio; cfg: CityConfig; t
   const short = cost.filter((m) => (inventory?.[m] ?? 0) < (s.cost[m] ?? 0));
   const blocked =
     shown >= 100
-      ? 'Están al día.'
+      ? t.barrio.upToDate
       : doneToday
-        ? 'Hoy ya las mantuviste. Mañana podés de nuevo.'
+        ? t.barrio.doneToday
         : me.jornadas < 1
           ? new GameError('NO_JORNADAS').message
           : short.length > 0
-            ? `Te falta ${short.map((m) => MATERIAL_LABEL[m]).join(' y ')}: cuesta ${costText}.`
+            ? t.barrio.shortOf(short.map((m) => MATERIAL_LABEL[m]).join(t.common.and), costText)
             : null;
 
   // "Marta (3), Juan (1)": quién las mantuvo, de más a menos veces.
   const names = new Map(players.map((p) => [p.id, p.display_name]));
   const counts = new Map<string, number>();
   for (const r of log ?? []) if (r.actor_id) counts.set(r.actor_id, (counts.get(r.actor_id) ?? 0) + 1);
-  const who = [...counts].sort((a, b) => b[1] - a[1]).map(([id, n]) => `${names.get(id) ?? 'Alguien'} (${n})`);
+  const who = [...counts].sort((a, b) => b[1] - a[1]).map(([id, n]) => `${names.get(id) ?? t.common.someone} (${n})`);
 
   const maintain = async () => {
     setBusy(true);
@@ -226,29 +227,25 @@ function Streets({ barrio, cfg, timezone }: { barrio: Barrio; cfg: CityConfig; t
 
   return (
     <section>
-      <h3>Calles</h3>
-      <p className="citizens">
-        Estado <strong>{shown}</strong> de 100 · {streetsLevel(state, s)}
-      </p>
+      <h3>{t.barrio.streets}</h3>
+      <p className="citizens">{t.barrio.streetsState(shown, t.streetsLevel[streetsLevel(state, s)])}</p>
       <div className={`bar streets ${streetsLevel(state, s)}`}>
         <span style={{ width: `${state}%` }} />
       </div>
-      <p className="muted">
-        Se gastan {s.decay_per_day} por día; cada mantenimiento suma {s.points}.
-      </p>
+      <p className="muted">{t.barrio.decay(s.decay_per_day, s.points)}</p>
       {error && <p className="error">{error}</p>}
       {blocked ? (
         <p className="muted">{blocked}</p>
       ) : (
         <div className="row">
           <button type="button" className="primary" disabled={busy} onClick={maintain}>
-            Mantener ({costText})
+            {t.barrio.maintain(costText)}
           </button>
         </div>
       )}
       {log && (
         <p className="muted">
-          {who.length ? `Las mantuvieron: ${who.join(', ')}.` : 'Nadie las mantuvo esta semana.'}
+          {who.length ? t.barrio.maintainedBy(who.join(', ')) : t.barrio.nobodyMaintained}
         </p>
       )}
     </section>

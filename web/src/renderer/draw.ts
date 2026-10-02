@@ -7,6 +7,7 @@
 import type { BuildingType, MapBarrio as Barrio, MapLot as Lot, MapWork as PublicWork } from '../types/game';
 import { workPercent, type Cell } from '../game/geo';
 import { formatRemaining } from '../game/format';
+import { t as i18n } from '../i18n';
 import type { Layout } from './layout';
 import { ABANDONED, darken, desaturate, lighten, lotColor, mix } from './colors';
 import { CURB, streetBarrios, streetsOf, ZEBRA } from './streets';
@@ -1529,7 +1530,7 @@ function drawClosedBarrios(ctx: CanvasRenderingContext2D, scene: Scene, layout: 
     ctx.font = `600 ${Math.round(t * 0.24)}px system-ui, sans-serif`;
     ctx.fillText(barrio.name, cx, cy - t * 0.16);
     ctx.font = `${Math.round(t * 0.17)}px system-ui, sans-serif`;
-    ctx.fillText('se abre pronto', cx, cy + t * 0.16);
+    ctx.fillText(i18n.city.opensSoon, cx, cy + t * 0.16);
     ctx.restore();
   }
 }

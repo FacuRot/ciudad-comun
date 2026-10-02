@@ -5,6 +5,7 @@ import { sb } from './client';
 import { refreshCity, refreshMe } from './sync';
 import { useCity } from '../store/city';
 import { toastFor } from '../game/events';
+import { t } from '../i18n';
 import type { Barrio, Construction, GameEvent, Lot, PublicWork } from '../types/game';
 
 const SUBSCRIBE_TIMEOUT_MS = 5_000;
@@ -32,7 +33,7 @@ export function connectCity(): () => void {
   const timeout = setTimeout(startPolling, SUBSCRIBE_TIMEOUT_MS);
 
   const nameOf = (id: string | null) =>
-    useCity.getState().snapshot?.players.find((p) => p.id === id)?.display_name ?? 'Alguien';
+    useCity.getState().snapshot?.players.find((p) => p.id === id)?.display_name ?? t.common.someone;
 
   // La obra terminada y el barrio abierto no son eventos dirigidos a nadie: se avisan
   // mirando la fila que cambió, que ya llega por su canal.
@@ -40,7 +41,7 @@ export function connectCity(): () => void {
     const before = useCity.getState().snapshot?.works.find((w) => w.id === work.id);
     useCity.getState().applyWork(work);
     if (before && before.status !== 'completada' && work.status === 'completada') {
-      useCity.getState().pushToast(`Se terminó la obra ${work.name}.`);
+      useCity.getState().pushToast(t.toast.workDone(work.name));
     }
   };
 
@@ -48,7 +49,7 @@ export function connectCity(): () => void {
     const before = useCity.getState().snapshot?.barrios.find((b) => b.id === barrio.id);
     useCity.getState().applyBarrio(barrio);
     if (before && before.status === 'cerrado' && barrio.status === 'abierto') {
-      useCity.getState().pushToast(`Se abrió el ${barrio.name}: hay lotes nuevos.`);
+      useCity.getState().pushToast(t.toast.barrioOpened(barrio.name));
     }
   };
 

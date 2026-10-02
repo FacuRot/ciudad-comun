@@ -6,6 +6,7 @@ import { messageOf } from '../api/errors';
 import { useCity } from '../store/city';
 import { navigate } from '../router';
 import { Notice } from '../App';
+import { t } from '../i18n';
 
 export function EntrarScreen() {
   const session = useCity((s) => s.session);
@@ -16,7 +17,7 @@ export function EntrarScreen() {
     if (session) navigate('/city', true);
   }, [session]);
 
-  if (session) return <Notice>Cargando…</Notice>;
+  if (session) return <Notice>{t.common.loading}</Notice>;
 
   return (
     <div className="entrada">
@@ -46,8 +47,8 @@ function LoginCard({ onOlvide }: { onOlvide: () => void }) {
 
   return (
     <form className="card" onSubmit={submit}>
-      <h1>Entrar a Ciudad Común</h1>
-      <label htmlFor="email">Tu email</label>
+      <h1>{t.login.title}</h1>
+      <label htmlFor="email">{t.common.yourEmail}</label>
       <input
         id="email"
         type="email"
@@ -56,7 +57,7 @@ function LoginCard({ onOlvide }: { onOlvide: () => void }) {
         value={email}
         onChange={(e) => setEmail(e.target.value)}
       />
-      <label htmlFor="clave">Tu contraseña</label>
+      <label htmlFor="clave">{t.common.yourPassword}</label>
       <input
         id="clave"
         type="password"
@@ -68,15 +69,15 @@ function LoginCard({ onOlvide }: { onOlvide: () => void }) {
       {error && <p className="error">{error}</p>}
       <div className="row">
         <button className="primary" disabled={busy}>
-          Entrar
+          {t.common.logIn}
         </button>
       </div>
       <p>
         <button type="button" className="link" onClick={onOlvide}>
-          Olvidé mi contraseña
+          {t.login.forgot}
         </button>
       </p>
-      <p className="muted">¿Te invitaron y todavía no tenés lote? Abrí el link que te pasaron.</p>
+      <p className="muted">{t.login.invitedHint}</p>
     </form>
   );
 }
@@ -101,20 +102,20 @@ function OlvideCard({ onBack }: { onBack: () => void }) {
 
   return (
     <form className="card" onSubmit={submit}>
-      <h1>Contraseña nueva</h1>
+      <h1>{t.login.newTitle}</h1>
       {state === 'sent' ? (
         <>
-          <p>Revisá tu email. Te mandamos un link para elegir una contraseña nueva.</p>
+          <p>{t.login.sent}</p>
           <div className="row">
             <button type="button" className="secondary" onClick={onBack}>
-              Volver
+              {t.common.back}
             </button>
           </div>
         </>
       ) : (
         <>
-          <p>Te mandamos un link para elegir otra.</p>
-          <label htmlFor="email">Tu email</label>
+          <p>{t.login.intro}</p>
+          <label htmlFor="email">{t.common.yourEmail}</label>
           <input
             id="email"
             type="email"
@@ -126,10 +127,10 @@ function OlvideCard({ onBack }: { onBack: () => void }) {
           {error && <p className="error">{error}</p>}
           <div className="row">
             <button type="button" className="secondary" onClick={onBack} disabled={state === 'sending'}>
-              Volver
+              {t.common.back}
             </button>
             <button className="primary" disabled={state === 'sending'}>
-              Mandame el link
+              {t.login.sendLink}
             </button>
           </div>
         </>

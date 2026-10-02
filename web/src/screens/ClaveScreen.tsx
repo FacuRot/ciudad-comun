@@ -5,6 +5,7 @@ import { cambiarClave } from '../api/auth';
 import { GameError, messageOf } from '../api/errors';
 import { useCity } from '../store/city';
 import { navigate } from '../router';
+import { t } from '../i18n';
 
 const MIN = 8;
 
@@ -19,11 +20,11 @@ export function ClaveScreen() {
     return (
       <div className="entrada">
         <div className="card">
-          <h1>Contraseña</h1>
+          <h1>{t.password.title}</h1>
           <p>{new GameError('BAD_RECOVERY').message}</p>
           <div className="row">
             <button type="button" className="primary" onClick={() => navigate('/entrar', true)}>
-              Pedir otro link
+              {t.password.askAnother}
             </button>
           </div>
         </div>
@@ -47,8 +48,8 @@ export function ClaveScreen() {
   return (
     <div className="entrada">
       <form className="card" onSubmit={submit}>
-        <h1>Elegí tu contraseña</h1>
-        <label htmlFor="clave">Contraseña nueva (mínimo {MIN} caracteres)</label>
+        <h1>{t.password.choose}</h1>
+        <label htmlFor="clave">{t.password.newLabel(MIN)}</label>
         <input
           id="clave"
           type="password"
@@ -61,7 +62,7 @@ export function ClaveScreen() {
         {error && <p className="error">{error}</p>}
         <div className="row">
           <button className="primary" disabled={busy || password.length < MIN}>
-            Guardar
+            {t.common.save}
           </button>
         </div>
       </form>

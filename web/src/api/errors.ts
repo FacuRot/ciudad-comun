@@ -1,53 +1,11 @@
 // Traduce los códigos que lanzan las funciones (docs/06-acciones-y-api.md) a mensajes.
-// Nunca se muestra el texto crudo de Postgres.
+// Nunca se muestra el texto crudo de Postgres. Además de los del contrato hay códigos de la
+// entrada con contraseña (authCodeOf), derivados de restricciones de la base (codeOf) y
+// propios del cliente (OFFLINE, UNKNOWN).
+import { t } from '../i18n';
 
-const MESSAGES: Record<string, string> = {
-  NO_AUTH: 'Entrá con tu email y contraseña para seguir.',
-  NO_PLAYER: 'Todavía no tenés lote. Entrá con el link de tu invitación.',
-  ALREADY_PLAYER: 'Ya tenés un lote en la ciudad.',
-  BAD_INVITE: 'Esta invitación ya no sirve. Pedile otra a quien te invitó.',
-  LOT_NOT_FREE: 'Alguien se adelantó. Elegí otro lote.',
-  LOT_ISOLATED: 'Elegí un lote más cerca de tus vecinos.',
-  BAD_COLOR: 'Elegí uno de los colores de la paleta.',
-  NO_JORNADAS: 'Te quedaste sin jornadas por hoy. Mañana tenés 3 más.',
-  NO_MATERIALS: 'Te faltan materiales. Pediles a tus vecinos.',
-  NO_LOT: 'Ese lote no está disponible.',
-  ALREADY_BUILDING: 'Tu lote ya está en obra.',
-  MAX_LEVEL: 'Tu edificio ya está al máximo.',
-  TYPE_LOCKED: 'El tipo de edificio no se cambia.',
-  NO_CONSTRUCTION: 'Esa obra ya terminó.',
-  OWN_CONSTRUCTION: 'Esto es para ayudar a otros.',
-  OWN_LOT: 'Esto es para ayudar a otros.',
-  SELF_GIFT: 'Esto es para ayudar a otros.',
-  OTHER_CITY: 'Eso es de otra ciudad.',
-  NO_WORK: 'Esa obra ya está terminada.',
-  WORK_NEEDS_MATERIALS: 'La obra ya tiene todas sus jornadas: ahora faltan materiales.',
-  LOT_NOT_NEGLECTED: 'Este lote está bien cuidado.',
-  CARE_LIMIT: 'Este lote ya recibió todos los cuidados posibles.',
-  GIFT_TOO_SMALL: 'El regalo mínimo es de 5 unidades.',
-  RENT_MATERIAL: 'Elegí qué material vas a cobrar de alquiler.',
-  STREETS_FULL: 'Las calles ya están al día.',
-  STREETS_DONE_TODAY: 'Hoy ya mantuviste estas calles. Mañana podés de nuevo.',
-  BAD_AMOUNT: 'Las cantidades no pueden ser negativas.',
-  NOT_ADMIN: 'Esto es solo para el equipo.',
-  // De la entrada con contraseña (ver authCodeOf).
-  BAD_CREDENTIALS: 'Email o contraseña incorrectos.',
-  EMAIL_TAKEN: 'Ese email ya tiene cuenta. Entrá con tu contraseña.',
-  WEAK_PASSWORD: 'La contraseña necesita al menos 8 caracteres.',
-  BAD_EMAIL: 'Revisá el email: parece que tiene un error.',
-  TOO_MANY: 'Probaste muchas veces. Esperá un minuto.',
-  SAME_PASSWORD: 'Elegí una contraseña distinta a la anterior.',
-  BAD_RECOVERY: 'Este link de contraseña ya venció. Pedí uno nuevo.',
-  CONFIRM_EMAIL: 'Te mandamos un email para confirmar la cuenta. Abrilo y volvé a este link.',
-  // Derivados de restricciones de la base (ver codeOf).
-  ALREADY_HELPED: 'Ya ayudaste en esta obra.',
-  LOT_NAME_TAKEN: 'Ese nombre ya lo usa otro lote.',
-  DISPLAY_NAME_TAKEN: 'Ese apodo ya lo usa otra persona.',
-  NAME_LENGTH: 'Tiene que tener entre 2 y 24 caracteres.',
-  // Propios del cliente: no los lanza ninguna función.
-  OFFLINE: 'Se cortó la conexión. Probá de nuevo cuando vuelva.',
-  UNKNOWN: 'Algo salió mal. Probá de nuevo en un rato.',
-};
+// Los textos de cada código, en el idioma del navegador, viven en i18n (errors).
+const MESSAGES = t.errors;
 
 // Violaciones de restricciones que el contrato no convierte en código propio.
 const CONSTRAINTS: Record<string, string> = {

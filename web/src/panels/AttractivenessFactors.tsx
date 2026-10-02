@@ -3,6 +3,7 @@
 import type { Attractiveness } from '../game/citizens';
 import { FACTOR_KEYS } from '../game/citizens';
 import { FACTOR_LABEL, formatPercent, reasonText } from '../game/format';
+import { t } from '../i18n';
 
 export function AttractivenessFactors({ attractiveness, workName }: { attractiveness: Attractiveness; workName?: string }) {
   const reason = attractiveness.mainReason;
@@ -22,15 +23,7 @@ export function AttractivenessFactors({ attractiveness, workName }: { attractive
           );
         })}
       </ul>
-      <p>
-        {reason ? (
-          <>
-            Lo que más resta: <strong>{reasonText(reason, workName)}</strong>.
-          </>
-        ) : (
-          'No le falta nada.'
-        )}
-      </p>
+      <p>{reason ? t.mainReason(reasonText(reason, workName)) : t.nothingMissing}</p>
     </>
   );
 }

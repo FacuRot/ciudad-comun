@@ -8,8 +8,8 @@ export function Toasts() {
   const toasts = useCity((s) => s.toasts);
   return (
     <div className="toasts">
-      {toasts.map((t) => (
-        <ToastLine key={t.id} toast={t} />
+      {toasts.map((toast) => (
+        <ToastLine key={toast.id} toast={toast} />
       ))}
     </div>
   );

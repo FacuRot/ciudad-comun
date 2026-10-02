@@ -5,9 +5,10 @@ import { GameError, messageOf } from '../api/errors';
 import { loadContributions } from '../api/reads';
 import { useCity } from '../store/city';
 import { workAmounts } from '../game/geo';
-import { MATERIAL_LABEL, formatPercent, plural } from '../game/format';
+import { MATERIAL_LABEL, formatPercent } from '../game/format';
 import { configOf, type Material, type PublicWork, type WorkAmounts } from '../types/game';
 import { PanelBack } from './PanelBack';
+import { t } from '../i18n';
 
 const MATERIALS: Material[] = ['ladrillo', 'madera', 'energia'];
 
@@ -28,10 +29,10 @@ export function WorkPanel({ work, onBack }: { work: PublicWork; onBack: () => vo
         <PanelBack onBack={onBack} />
         <h2>{work.name}</h2>
         <p className="muted">
-          {barrio?.name ?? 'La ciudad'} ·{' '}
+          {barrio?.name ?? t.work.theCity} ·{' '}
           {done
-            ? `obra terminada: +${formatPercent(cfg.production.public_work_bonus)} de producción`
-            : `al terminarse, +${formatPercent(cfg.production.public_work_bonus)} de producción para todos los lotes del barrio`}
+            ? t.work.doneBonus(formatPercent(cfg.production.public_work_bonus))
+            : t.work.pendingBonus(formatPercent(cfg.production.public_work_bonus))}
         </p>
       </section>
 
@@ -39,7 +40,7 @@ export function WorkPanel({ work, onBack }: { work: PublicWork; onBack: () => vo
         {(['ladrillo', 'madera', 'energia', 'jornadas'] as const).map((k) => (
           <WorkBar
             key={k}
-            label={k === 'jornadas' ? 'jornadas' : MATERIAL_LABEL[k]}
+            label={k === 'jornadas' ? t.work.jornadas : MATERIAL_LABEL[k]}
             value={progress[k]}
             total={cost[k]}
             missing={missing(k)}
@@ -69,7 +70,7 @@ function WorkBar({ label, value, total, missing }: { label: string; value: numbe
         <span>{label}</span>
         <span className="muted">
           {value} / {total}
-          {missing > 0 && ` · falta ${missing}`}
+          {missing > 0 && t.work.missing(missing)}
         </span>
       </p>
       <div className="bar">
@@ -125,7 +126,7 @@ function ContributeForm(props: {
 
   return (
     <section>
-      <h3>Aportar</h3>
+      <h3>{t.work.contribute}</h3>
       <div className="give">
         {MATERIALS.map((m) => (
           <label key={m}>
@@ -139,7 +140,7 @@ function ContributeForm(props: {
               disabled={busy || cap(m) === 0}
               onChange={(e) => set(m, e.target.value)}
             />
-            <small className="muted">de {have(m)}</small>
+            <small className="muted">{t.work.ofHave(have(m))}</small>
           </label>
         ))}
       </div>
@@ -151,7 +152,7 @@ function ContributeForm(props: {
       {error && <p className="error">{error}</p>}
       <div className="row">
         <button type="button" className="primary" disabled={busy || jornadas < 1 || needsMaterials} onClick={submit}>
-          Aportar (1 jornada)
+          {t.work.contributeButton}
         </button>
       </div>
     </section>
@@ -185,15 +186,15 @@ function Placa({ work, done, meId }: { work: PublicWork; done: boolean; meId: st
 
   return (
     <section>
-      <h3>{done ? 'La construyeron' : 'Quiénes aportaron'}</h3>
+      <h3>{done ? t.work.builtBy : t.work.contributors}</h3>
       {list.length === 0 ? (
-        <p className="muted">Todavía no aportó nadie. Podés ser la primera persona.</p>
+        <p className="muted">{t.work.noContributors}</p>
       ) : (
         <ul className="placa">
           {list.map(([id, count]) => (
             <li key={id} className={id === meId ? 'me' : undefined}>
-              <span>{names.get(id) ?? 'alguien'}</span>
-              <span className="muted">{plural(count, 'aporte', 'aportes')}</span>
+              <span>{names.get(id) ?? t.common.someoneLower}</span>
+              <span className="muted">{t.work.contributions(count)}</span>
             </li>
           ))}
         </ul>

@@ -8,6 +8,7 @@ import { CityGate } from './screens/CityScreen';
 import { ClaveScreen } from './screens/ClaveScreen';
 import { EntrarScreen } from './screens/EntrarScreen';
 import { JoinScreen } from './screens/JoinScreen';
+import { t } from './i18n';
 
 const ROUTES = ['/city', '/entrar', '/clave', '/admin'];
 
@@ -21,7 +22,7 @@ export function App() {
     if (!join && !ROUTES.includes(path)) navigate('/city', true);
   }, [path, join]);
 
-  if (!authReady) return <Notice>Cargando…</Notice>;
+  if (!authReady) return <Notice>{t.common.loading}</Notice>;
   if (join) return <JoinScreen token={decodeURIComponent(join[1])} />;
   if (path === '/entrar') return <EntrarScreen />;
   if (path === '/clave') return <ClaveScreen />;

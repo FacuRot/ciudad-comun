@@ -3,6 +3,7 @@ import type { Cell } from '../game/geo';
 import { cellAt, clampView, computeLayout, zoomAt, WHOLE_CITY, type Layout, type View } from './layout';
 import { drawScene, type Scene } from './draw';
 import { Traffic } from './traffic';
+import { t } from '../i18n';
 
 type Props = {
   scene: Scene;
@@ -202,7 +203,7 @@ export function CityCanvas({ scene, onCellClick, tooltip }: Props) {
       )}
       {zoomed && (
         <button type="button" className="unzoom" onClick={resetView}>
-          Ver toda la ciudad
+          {t.city.seeAll}
         </button>
       )}
     </div>
